@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pid
+
+# Environment
+.env
+
+# Logs
+*.log
+ec_server_log.txt
+dna.aep Logs/
+
+# After Effects
+Adobe After Effects Auto-Save/
+dna.aep
+
+# Backups and old versions
+Backup/
+DNA_TOX_V1/
+dna_controller TOX/
+dna_d1.39.toe
+
+# Build artifacts
+python_soem-main/build/
+
+# PDFs (hardware manuals - too large for git)
+*.pdf
+
+# Temp files
+temp_script_fix.py
+
+# IDE / Editor
+.claude/
+.vscode/

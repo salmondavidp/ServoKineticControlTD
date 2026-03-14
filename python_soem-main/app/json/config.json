@@ -1,0 +1,82 @@
+{
+    "_comment": "Copy the network_interface from the adapter list shown when starting the server",
+    "default_template": "config_both_copy.json",
+    "product": "hmrs_slider",
+    "config": {
+        "network_interface": "\\Device\\NPF_{AE88A581-6D1F-45F0-9B72-75EF98EB52DD}",
+        "mode": "PV",
+        "num_slaves": 1,
+        "actual_steps_per_meter": 792914,
+        "raw_steps_per_meter": 202985985,
+        "default_delay": 0.5
+    },
+    "speed": {
+        "velocity": 1000,
+        "acceleration": 500,
+        "deceleration": 500
+    },
+    "positions": {
+        "HOME": [
+            0
+        ],
+        "POS_05": [
+            0.5
+        ],
+        "POS_NEG05": [
+            -0.5
+        ],
+        "POS_1": [
+            1
+        ],
+        "POS_NEG1": [
+            -1
+        ],
+        "POS_025": [
+            0.25
+        ],
+        "POS_NEG025": [
+            -0.25
+        ],
+        "END": [
+            0
+        ]
+    },
+    "osc": {
+        "osc_mode": "send",
+        "send_ip": "127.0.0.1",
+        "send_port": 9000,
+        "recv_ip": "0.0.0.0",
+        "recv_port": 8001,
+        "osc_send_address": [
+            "/template_step",
+            "/composition/layers/1/clips/{v}/connect"
+        ]
+    },
+    "template": {
+        "name": "MY_SEQUENCE",
+        "loop": false,
+        "loop_count": 1,
+        "sequence": [
+            [
+                "HOME"
+            ],
+            [
+                "POS_05",
+                1
+            ],
+            [
+                "POS_NEG05"
+            ],
+            [
+                "END"
+            ]
+        ]
+    },
+    "speed_correction": {
+        "ratio": 5.01,
+        "commanded_vel": 100,
+        "real_vel_units_ms": 19.95,
+        "elapsed_s": 39.73,
+        "distance_m": 1
+    }
+}

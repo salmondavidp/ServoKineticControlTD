@@ -1,0 +1,10 @@
+-> git commands
+------------
+git add .
+git config --global core.autocrlf input
+git commit -m "update"
+git push
+
+-> developer run
+------------
+py -3.13 run_web.py

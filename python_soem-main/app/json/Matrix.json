@@ -1,0 +1,75 @@
+{
+  "speed": {
+    "movement_speed": {
+      "velocity": 90000,
+      "acceleration": 45000,
+      "deceleration": 45000,
+      "csp_max_step": 100
+    }
+  },
+  "slaves": {
+    "count": 5,
+    "names": [
+      "Movement 1",
+      "Movement 2",
+      "Movement 3",
+      "Movement 4",
+      "Movement 5"
+    ],
+    "movement_slaves": [0, 1, 2, 3, 4]
+  },
+  "positions": {
+    "home_pos_M": [0, 0, 0, 0, 0],
+    "target_pos": [1, 1, 1, 1, 1],
+    "pattern1" : [0, 0.325, 0.6, 0.975, 1.2],
+    "pattern2" : [1.2, 0.975, 0.6, 0.325, 0],
+    "pattern3" : [0.6, 0.6, 0.6, 0.6, 0.6]
+  },
+  "template": {
+     "name": "Movement Sequence (5 Slaves)",
+    "description": "Movement-only sequence using 5 slaves",
+    "loop": false,
+    "operation_mode": "movement",
+    "is_global": false,
+    "is_simultaneous": false,
+    "slave_delay_ms": 30,
+    "steps": [
+      {
+        "name": "Motor 0 to Target",
+        "type": "movement",
+        "position": "pattern3",
+        "is_simultaneous": false,
+        "slave_delay_ms": 30,
+        "move_order": "dynamic",
+        "delay": 0
+      },
+      {
+        "name": "Motor 0 to Home",
+        "type": "movement",
+        "position": "pattern1",
+        "is_simultaneous": false,
+        "slave_delay_ms": 30,
+        "move_order": "dynamic",
+        "delay": 0
+      },
+      {
+        "name": "Motor 0 to Target",
+        "type": "movement",
+        "position": "pattern2",
+        "is_simultaneous": false,
+        "slave_delay_ms": 30,
+        "move_order": "dynamic",
+        "delay": 0
+      },
+      {
+        "name": "Motor 0 to Target",
+        "type": "movement",
+        "position": "pattern3",
+        "is_simultaneous": false,
+        "slave_delay_ms": 30,
+        "move_order": "dynamic",
+        "delay": 0
+      }
+    ]
+  }
+}

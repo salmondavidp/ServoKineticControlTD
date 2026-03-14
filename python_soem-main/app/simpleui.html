@@ -1,0 +1,2428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motor Control</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f0f4ff;
+            --bg-warm: #fef9f0;
+            --card: #ffffff;
+            --card-shadow: rgba(100, 120, 200, 0.12);
+            --text: #2d3356;
+            --text-light: #7c82a0;
+            --border: #e2e6f0;
+
+            --blue: #4c8bf5;
+            --blue-light: #6ba3ff;
+            --green: #34c759;
+            --green-light: #5ee87a;
+            --red: #ff4757;
+            --red-light: #ff6b7a;
+            --purple: #9b59f0;
+            --purple-light: #b57aff;
+            --orange: #ff9f43;
+            --orange-light: #ffb86c;
+            --pink: #ff6b9d;
+            --teal: #00d2d3;
+            --yellow: #feca57;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ========== Status Bar ========== */
+        .status-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 52px;
+            background: white;
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 10px;
+            z-index: 100;
+            box-shadow: 0 2px 12px rgba(100, 120, 200, 0.08);
+        }
+
+        .status-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #ccc;
+            flex-shrink: 0;
+            border: 2px solid white;
+            box-shadow: 0 0 0 2px #ddd;
+        }
+        .status-dot.disconnected { background: #ccc; box-shadow: 0 0 0 2px #ddd; }
+        .status-dot.connected { background: var(--blue); box-shadow: 0 0 0 2px rgba(76, 139, 245, 0.3); animation: pulse 2s infinite; }
+        .status-dot.enabled { background: var(--green); box-shadow: 0 0 0 2px rgba(52, 199, 89, 0.3); animation: pulse 2s infinite; }
+        .status-dot.moving { background: var(--green); box-shadow: 0 0 8px rgba(52, 199, 89, 0.5); animation: bounce-dot 0.6s infinite; }
+        .status-dot.fault { background: var(--red); box-shadow: 0 0 8px rgba(255, 71, 87, 0.5); animation: shake 0.4s infinite; }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.15); opacity: 0.7; }
+        }
+        @keyframes bounce-dot {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-2px); }
+            75% { transform: translateX(2px); }
+        }
+
+        .status-text {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-light);
+        }
+
+        .slave-badge {
+            margin-left: auto;
+            margin-right: 50px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--blue);
+            background: rgba(76, 139, 245, 0.1);
+            padding: 4px 14px;
+            border-radius: 20px;
+        }
+
+        /* ========== Pages ========== */
+        .page {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            padding: 72px 40px 30px;
+            min-height: 100vh;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .page.active { display: flex; }
+
+        .page-title {
+            font-size: 2.2rem;
+            font-weight: 900;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+        .page-subtitle {
+            font-size: 1rem;
+            color: var(--text-light);
+            font-weight: 600;
+            margin-bottom: 40px;
+        }
+
+        /* ========== Big Buttons ========== */
+        .main-buttons {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            margin-top: 30px;
+            width: 100%;
+        }
+
+        .big-btn {
+            width: 100%;
+            padding: 22px 32px;
+            font-family: 'Nunito', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 800;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            color: white;
+            min-height: 78px;
+            letter-spacing: 0.3px;
+            position: relative;
+            overflow: hidden;
+        }
+        .big-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 50%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.2), transparent);
+            border-radius: 20px 20px 0 0;
+            pointer-events: none;
+        }
+        .big-btn:hover { transform: translateY(-4px) scale(1.02); }
+        .big-btn:active { transform: translateY(-1px) scale(0.98); }
+        .big-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; filter: grayscale(0.5); }
+
+        .btn-home {
+            background: linear-gradient(135deg, var(--blue), var(--purple));
+            box-shadow: 0 6px 20px rgba(76, 139, 245, 0.35);
+        }
+        .btn-home:hover { box-shadow: 0 8px 30px rgba(76, 139, 245, 0.45); }
+
+        .btn-pattern {
+            background: linear-gradient(135deg, var(--green), var(--teal));
+            box-shadow: 0 6px 20px rgba(52, 199, 89, 0.35);
+        }
+        .btn-pattern:hover { box-shadow: 0 8px 30px rgba(52, 199, 89, 0.45); }
+
+        .btn-reset {
+            background: linear-gradient(135deg, var(--orange), var(--red));
+            box-shadow: 0 6px 20px rgba(255, 71, 87, 0.3);
+        }
+        .btn-reset:hover { box-shadow: 0 8px 30px rgba(255, 71, 87, 0.4); }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #ff4757, #c0392b);
+            box-shadow: 0 6px 24px rgba(255, 71, 87, 0.4);
+            font-size: 1.5rem;
+            letter-spacing: 2px;
+        }
+        .btn-stop:hover { box-shadow: 0 8px 30px rgba(255, 71, 87, 0.55); }
+
+        .btn-set-home {
+            background: linear-gradient(135deg, var(--purple), var(--pink));
+            box-shadow: 0 6px 20px rgba(155, 89, 240, 0.3);
+        }
+        .btn-set-home:hover { box-shadow: 0 8px 30px rgba(155, 89, 240, 0.4); }
+
+        .btn-run {
+            background: linear-gradient(135deg, var(--green), var(--teal));
+            box-shadow: 0 6px 20px rgba(52, 199, 89, 0.35);
+        }
+        .btn-run:hover { box-shadow: 0 8px 30px rgba(52, 199, 89, 0.45); }
+
+        .btn-stop-pattern {
+            background: linear-gradient(135deg, var(--orange), var(--red));
+            box-shadow: 0 4px 16px rgba(255, 71, 87, 0.25);
+        }
+
+        /* ========== Developer Mode Link ========== */
+        .developer-link { position: fixed; bottom: 16px; right: 16px; z-index: 100; }
+        .developer-link a {
+            padding: 14px 24px;
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 25px;
+            color: var(--text-light);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 700;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px var(--card-shadow);
+        }
+        .developer-link a:hover {
+            color: var(--purple);
+            border-color: var(--purple);
+            box-shadow: 0 4px 16px rgba(155, 89, 240, 0.15);
+        }
+
+        /* ========== Page Header ========== */
+        .page-header {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .back-btn {
+            padding: 16px 28px;
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            color: var(--text-light);
+            cursor: pointer;
+            font-family: 'Nunito', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 700;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px var(--card-shadow);
+        }
+        .back-btn:hover {
+            color: var(--blue);
+            border-color: var(--blue);
+            transform: translateX(-3px);
+        }
+
+        .page-header h2 {
+            font-size: 1.6rem;
+            font-weight: 800;
+        }
+
+        /* ========== Controls ========== */
+        .control-section {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .product-display {
+            width: 100%;
+            padding: 20px 24px;
+            font-family: 'Nunito', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 700;
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 18px;
+            color: var(--text);
+            box-shadow: 0 2px 8px var(--card-shadow);
+            min-height: 64px;
+            display: flex;
+            align-items: center;
+            text-align: center;
+            justify-content: center;
+        }
+
+        /* ========== Pillar Layout ========== */
+        .pillar-container {
+            width: 100%;
+            overflow-x: auto;
+            padding: 8px 0;
+        }
+
+        .pillar-row {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            min-width: fit-content;
+        }
+
+        .pillar {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            padding: 10px 8px 12px;
+            border-radius: 16px;
+            border: 3px solid transparent;
+            background: white;
+            box-shadow: 0 2px 8px var(--card-shadow);
+        }
+        .pillar:hover {
+            border-color: rgba(76, 139, 245, 0.3);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px var(--card-shadow);
+        }
+        .pillar.selected {
+            border-color: var(--blue);
+            background: linear-gradient(to bottom, rgba(76, 139, 245, 0.08), rgba(76, 139, 245, 0.02));
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(76, 139, 245, 0.2);
+        }
+
+        /* HMRS compact: single wide button per pillar */
+        .pillar.pillar-compact {
+            padding: 10px 10px 12px;
+        }
+        .pillar-compact .pillar-slot {
+            width: auto;
+            min-width: 120px;
+            height: 44px;
+            font-size: 0.85rem;
+            padding: 0 12px;
+        }
+
+        .pillar-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            font-weight: 800;
+            margin-bottom: 2px;
+        }
+        .pillar.selected .pillar-label { color: var(--blue); }
+
+        .pillar-slots {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .pillar-slot {
+            width: auto;
+            min-width: 86px;
+            height: 40px;
+            padding: 0 10px;
+            border-radius: 12px;
+            border: 2px solid var(--border);
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-light);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .pillar-slot:hover { border-color: var(--blue); }
+        .pillar-slot.slot-movement { border-left: 4px solid var(--blue); }
+        .pillar-slot.slot-rotation { border-left: 4px solid var(--orange); }
+        .pillar-slot.slot-row1 { border-left: 4px solid var(--blue); }
+        .pillar-slot.slot-row2 { border-left: 4px solid var(--purple); }
+        .pillar-slot.slot-row3 { border-left: 4px solid var(--green); }
+
+        .pillar.selected .pillar-slot.active-slot {
+            border-color: var(--blue);
+            background: rgba(76, 139, 245, 0.1);
+            color: var(--blue);
+            font-weight: 800;
+        }
+
+        .pillar-slot.target {
+            border-color: var(--green) !important;
+            background: rgba(52, 199, 89, 0.15) !important;
+            color: var(--green) !important;
+            font-weight: 800;
+            box-shadow: 0 0 8px rgba(52, 199, 89, 0.2);
+        }
+
+        .no-pillars {
+            color: var(--text-light);
+            font-size: 1rem;
+            font-weight: 600;
+            text-align: center;
+            padding: 24px;
+            background: white;
+            border-radius: 16px;
+            border: 2px dashed var(--border);
+        }
+
+        .pillar-hint {
+            text-align: center;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-light);
+            padding: 4px 0;
+            transition: all 0.3s;
+        }
+        .pillar-hint.flash {
+            color: var(--red);
+            animation: hint-flash 0.6s ease;
+        }
+        @keyframes hint-flash {
+            0%, 100% { transform: scale(1); }
+            30% { transform: scale(1.08); }
+        }
+
+        /* ========== Direction Row ========== */
+        .direction-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .direction-row select {
+            flex: 1;
+            padding: 20px 20px;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 700;
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 18px;
+            color: var(--text);
+            font-size: 1.1rem;
+            min-height: 64px;
+            box-shadow: 0 2px 8px var(--card-shadow);
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237c82a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            background-size: 20px;
+            padding-right: 42px;
+        }
+        .direction-row select:focus { outline: none; border-color: var(--blue); }
+
+        .dir-btn {
+            flex: 1;
+            padding: 20px 16px;
+            font-family: 'Nunito', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 800;
+            border: none;
+            border-radius: 18px;
+            cursor: pointer;
+            color: white;
+            min-height: 64px;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            user-select: none;
+            -webkit-user-select: none;
+            position: relative;
+            overflow: hidden;
+        }
+        .dir-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 50%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.2), transparent);
+            border-radius: 16px 16px 0 0;
+            pointer-events: none;
+        }
+        .dir-btn:active { transform: scale(0.95); }
+        .dir-btn.btn-left {
+            background: linear-gradient(135deg, var(--blue), var(--blue-light));
+            box-shadow: 0 4px 14px rgba(76, 139, 245, 0.35);
+        }
+        .dir-btn.btn-right {
+            background: linear-gradient(135deg, var(--purple), var(--purple-light));
+            box-shadow: 0 4px 14px rgba(155, 89, 240, 0.35);
+        }
+
+        /* ========== Pattern Page ========== */
+        .template-info {
+            width: 100%;
+            background: white;
+            padding: 20px 24px;
+            border-radius: 18px;
+            border: 2px solid var(--border);
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 2px 12px var(--card-shadow);
+        }
+
+        .template-label { font-size: 0.85rem; color: var(--text-light); font-weight: 700; margin-bottom: 4px; }
+        .template-name { font-size: 1.3rem; font-weight: 800; color: var(--purple); }
+
+        .pattern-grid {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .card {
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 18px;
+            padding: 24px;
+            box-shadow: 0 2px 12px var(--card-shadow);
+        }
+
+        .card h3 { font-size: 1.1rem; color: var(--text-light); font-weight: 800; margin-bottom: 16px; }
+
+        .input-group { margin-bottom: 12px; }
+        .input-group label { display: block; font-size: 1rem; color: var(--text-light); font-weight: 700; margin-bottom: 6px; }
+        .input-group input {
+            width: 100%;
+            padding: 16px 18px;
+            font-family: 'Nunito', sans-serif;
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 14px;
+            color: var(--text);
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+        .input-group input:focus, .input-group select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 4px rgba(76, 139, 245, 0.1); }
+        .input-group select {
+            width: 100%;
+            padding: 16px 18px;
+            font-family: 'Nunito', sans-serif;
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 14px;
+            color: var(--text);
+            font-size: 1.05rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .input-group input:disabled, .input-group select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .osc-addr-list { font-size: 0.85rem; color: var(--text-light); }
+        .osc-addr-list .osc-addr-title { font-weight: 700; margin-bottom: 6px; }
+        .osc-addr-list .osc-addr-item {
+            padding: 6px 10px;
+            background: var(--bg);
+            border-radius: 8px;
+            margin-bottom: 4px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            word-break: break-all;
+        }
+
+        .run-controls { display: flex; flex-direction: column; gap: 14px; }
+        .run-controls .big-btn { min-height: 70px; font-size: 1.2rem; }
+
+        .pattern-status {
+            width: 100%;
+            margin-top: 16px;
+            padding: 18px;
+            border-radius: 16px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            text-align: center;
+            color: var(--text-light);
+        }
+        .pattern-status.running {
+            background: rgba(52, 199, 89, 0.1);
+            border: 2px solid var(--green);
+            color: var(--green);
+        }
+        .pattern-status.stopped {
+            background: rgba(255, 71, 87, 0.08);
+            border: 2px solid var(--red);
+            color: var(--red);
+        }
+
+        /* ========== Interface Overlay ========== */
+        .interface-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        .interface-overlay.show { display: flex; }
+
+        .interface-card {
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 20px;
+            padding: 30px;
+            width: 600px;
+            max-width: 90vw;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+        }
+        .interface-card h2 {
+            color: var(--blue);
+            font-size: 1.3rem;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+        .interface-card .subtitle {
+            color: var(--text-light);
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .interface-scanning {
+            text-align: center;
+            padding: 40px 0;
+            color: var(--text-light);
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+        .interface-scanning .spinner {
+            display: inline-block;
+            width: 28px; height: 28px;
+            border: 3px solid var(--border);
+            border-top-color: var(--blue);
+            border-radius: 50%;
+            animation: iface-spin 0.8s linear infinite;
+            margin-bottom: 12px;
+        }
+        @keyframes iface-spin { to { transform: rotate(360deg); } }
+
+        .interface-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .interface-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: 14px;
+            cursor: default;
+            transition: all 0.2s;
+            opacity: 0.5;
+        }
+        .interface-row.has-slaves {
+            cursor: pointer;
+            opacity: 1;
+        }
+        .interface-row.has-slaves:hover {
+            border-color: var(--blue);
+            background: rgba(76, 139, 245, 0.06);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--card-shadow);
+        }
+        .interface-row .iface-info { flex: 1; min-width: 0; }
+        .interface-row .iface-desc {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .interface-row .iface-name {
+            font-size: 0.7rem;
+            color: var(--text-light);
+            font-family: monospace;
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .interface-row .iface-badge {
+            margin-left: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .slave-count-badge {
+            font-size: 0.75rem;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 10px;
+        }
+        .slave-count-badge.has-slaves {
+            background: rgba(52, 199, 89, 0.15);
+            color: var(--green);
+        }
+        .slave-count-badge.no-slaves {
+            background: rgba(124, 130, 160, 0.15);
+            color: var(--text-light);
+        }
+        .interface-actions {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .rescan-btn {
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-light);
+            font-family: 'Nunito', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .rescan-btn:hover { border-color: var(--blue); color: var(--blue); }
+
+        .interface-status-msg {
+            margin-top: 15px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-align: center;
+            display: none;
+        }
+        .interface-status-msg.saving { display: block; background: rgba(76, 139, 245, 0.1); color: var(--blue); }
+        .interface-status-msg.success { display: block; background: rgba(52, 199, 89, 0.1); color: var(--green); }
+        .interface-status-msg.error { display: block; background: rgba(255, 71, 87, 0.1); color: var(--red); }
+
+        /* ========== Debug Panel ========== */
+        .debug-toggle-btn {
+            position: fixed;
+            top: 10px;
+            right: 20px;
+            z-index: 101;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            background: white;
+            color: var(--text-light);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px var(--card-shadow);
+            transition: all 0.2s;
+        }
+        .debug-toggle-btn:hover {
+            color: var(--purple);
+            border-color: var(--purple);
+            box-shadow: 0 4px 16px rgba(155, 89, 240, 0.15);
+            transform: scale(1.1);
+        }
+        .debug-toggle-btn.active {
+            background: var(--purple);
+            color: white;
+            border-color: var(--purple);
+            box-shadow: 0 4px 16px rgba(155, 89, 240, 0.3);
+        }
+
+        .debug-panel {
+            display: none;
+            position: fixed;
+            top: 52px;
+            right: 0;
+            width: 380px;
+            max-width: 90vw;
+            height: calc(100vh - 52px);
+            background: var(--bg);
+            box-shadow: -4px 0 24px rgba(100, 120, 200, 0.15);
+            overflow-y: auto;
+            z-index: 200;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.25s ease-out;
+        }
+        .debug-panel.show {
+            display: flex;
+            transform: translateX(0);
+        }
+
+        .debug-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: white;
+            border-bottom: 2px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .debug-panel-header h3 {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--purple);
+            margin: 0;
+        }
+        .debug-close-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            background: white;
+            color: var(--text-light);
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 800;
+        }
+        .debug-close-btn:hover {
+            color: var(--red);
+            border-color: var(--red);
+            background: rgba(255, 71, 87, 0.08);
+        }
+
+        .debug-section { padding: 16px 20px; }
+        .debug-section-title {
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .debug-table-wrap {
+            border-radius: 14px;
+            overflow: hidden;
+            border: 2px solid var(--border);
+            background: white;
+            box-shadow: 0 2px 8px var(--card-shadow);
+        }
+        .debug-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+        .debug-table thead th {
+            background: var(--bg);
+            padding: 8px 10px;
+            font-weight: 800;
+            color: var(--text-light);
+            text-align: left;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            border-bottom: 2px solid var(--border);
+        }
+        .debug-table tbody td {
+            padding: 7px 10px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            color: var(--text);
+        }
+        .debug-table tbody tr:last-child td { border-bottom: none; }
+
+        .debug-status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        .debug-status-dot.ok { background: var(--green); }
+        .debug-status-dot.disabled { background: var(--orange); }
+        .debug-status-dot.fault { background: var(--red); }
+        .debug-status-dot.off { background: #ccc; }
+
+        .debug-table tbody tr.debug-step-active {
+            background: rgba(76, 139, 245, 0.12) !important;
+            border-left: 3px solid var(--blue);
+        }
+        .debug-table tbody tr.debug-step-complete {
+            background: rgba(52, 199, 89, 0.08);
+        }
+        .debug-step-time { font-weight: 700; font-variant-numeric: tabular-nums; }
+        .debug-step-time.running { color: var(--blue); }
+        .debug-step-time.done { color: var(--green); }
+
+        .debug-empty {
+            text-align: center;
+            color: var(--text-light);
+            font-weight: 600;
+            padding: 16px !important;
+        }
+
+        /* ========== Notification Toast ========== */
+        .toast-notification {
+            position: fixed;
+            top: 62px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: var(--green);
+            color: white;
+            padding: 12px 28px;
+            border-radius: 14px;
+            font-family: 'Nunito', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            box-shadow: 0 4px 20px rgba(52, 199, 89, 0.4);
+            z-index: 500;
+            opacity: 0;
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+        .toast-notification.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ========== Fun Decorations ========== */
+        .emoji-icon { font-size: 1.4rem; margin-right: 8px; }
+
+        /* ========== Responsive ========== */
+        @media (max-width: 500px) {
+            .pattern-grid { grid-template-columns: 1fr; }
+            .big-btn { padding: 20px 24px; font-size: 1.1rem; min-height: 65px; }
+            .pillar-slot { min-width: 70px; height: 36px; font-size: 0.7rem; }
+            .pillar-compact .pillar-slot { min-width: 100px; height: 40px; font-size: 0.75rem; }
+            .debug-panel { width: 100vw; max-width: 100vw; }
+            .debug-toggle-btn { width: 32px; height: 32px; top: 12px; right: 12px; }
+            .page-title { font-size: 1.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Interface Selection Overlay -->
+    <div class="interface-overlay" id="interfaceOverlay">
+        <div class="interface-card">
+            <h2>Select EtherCAT Interface</h2>
+            <div class="subtitle">The configured interface could not connect. Please select an interface with slaves.</div>
+
+            <div id="interfaceScanning" class="interface-scanning">
+                <div class="spinner"></div>
+                <div>Scanning network interfaces...</div>
+            </div>
+
+            <div id="interfaceListContainer" class="interface-list" style="display:none;"></div>
+
+            <div id="interfaceStatusMsg" class="interface-status-msg"></div>
+
+            <div class="interface-actions">
+                <button class="rescan-btn" onclick="scanInterfaces()">Rescan</button>
+                <span style="font-size: 0.75rem; color: var(--text-light); font-weight: 600;" id="interfaceScanTime"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <span class="status-dot disconnected" id="statusDot"></span>
+        <span class="status-text" id="statusText">Connecting...</span>
+        <span class="slave-badge" id="slaveBadge"></span>
+    </div>
+
+    <!-- Debug Toggle Button -->
+    <button class="debug-toggle-btn" id="debugToggleBtn" onclick="toggleDebugPanel()" title="Debug Panel">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m-7.07-3.93l4.24-4.24m5.66-5.66l4.24-4.24M1 12h6m6 0h6m-3.93 7.07l-4.24-4.24m-5.66-5.66L3.93 4.93"/>
+        </svg>
+    </button>
+
+    <!-- Debug Panel (side panel, no overlay) -->
+    <div class="debug-panel" id="debugPanel">
+        <div class="debug-panel-header">
+            <h3>Debug Monitor</h3>
+            <button class="debug-close-btn" onclick="toggleDebugPanel()">&times;</button>
+        </div>
+
+        <div class="debug-section">
+            <div class="debug-section-title">Slave Status</div>
+            <div class="debug-table-wrap">
+                <table class="debug-table" id="debugSlaveTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Position (m)</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="debugSlaveTableBody">
+                        <tr><td colspan="3" class="debug-empty">No motors connected</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="debug-section" id="debugTemplateSection" style="display:none;">
+            <div class="debug-section-title">Template Steps</div>
+            <div class="debug-table-wrap">
+                <table class="debug-table" id="debugTemplateTable">
+                    <thead>
+                        <tr>
+                            <th style="width:30px;">#</th>
+                            <th>Name</th>
+                            <th style="width:70px;">Order</th>
+                            <th style="width:60px;">Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="debugTemplateTableBody">
+                        <tr><td colspan="4" class="debug-empty">No template loaded</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast-notification" id="toastNotification"></div>
+
+    <!-- ========== PAGE: Main Screen ========== -->
+    <div id="page-main" class="page active">
+        <h1 class="page-title">Motor Control</h1>
+        <p class="page-subtitle">What would you like to do?</p>
+
+        <div class="main-buttons">
+            <button class="big-btn btn-home" id="btnSetHome" onclick="showPage('home')">
+                <span class="emoji-icon">&#x1F3E0;</span>Set Home Positions
+            </button>
+            <button class="big-btn btn-pattern" id="btnRunPattern" onclick="showPage('pattern')">
+                <span class="emoji-icon">&#x25B6;</span>Run Pattern
+            </button>
+            <button class="big-btn btn-reset" onclick="resetError()" id="resetErrorBtn" style="display: none;">
+                <span class="emoji-icon">&#x1F527;</span>Reset Error
+            </button>
+        </div>
+
+        <div class="developer-link">
+            <a href="/developer" onclick="if(isPatternRunning){sendCmd('stop');isPatternRunning=false;} sendCmd('disable'); return true;">Developer Mode</a>
+        </div>
+    </div>
+
+    <!-- ========== PAGE: Set Home Positions ========== -->
+    <div id="page-home" class="page">
+        <div class="page-header">
+            <button class="back-btn" onclick="showPage('main')">&#8592; Back</button>
+            <h2>Set Home Positions</h2>
+        </div>
+
+        <div class="control-section">
+            <!-- Product Display -->
+            <div class="product-display" id="productDisplay">Loading product...</div>
+
+            <!-- Pillar Layout -->
+            <div class="pillar-container">
+                <div class="pillar-row" id="pillarRow">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+            <div class="pillar-hint" id="pillarHint">Select a pillar to control</div>
+
+            <!-- Movement Type + Direction -->
+            <div class="direction-row">
+                <select id="movementTypeSelect" onchange="onMovementTypeChange()">
+                    <option value="Movement">Movement</option>
+                </select>
+                <button class="dir-btn btn-left" id="btnLeft"
+                    onclick="startVelocity('forward')">
+                    &#9664; LEFT
+                </button>
+                <button class="dir-btn btn-right" id="btnRight"
+                    onclick="startVelocity('backward')">
+                    RIGHT &#9654;
+                </button>
+            </div>
+
+            <!-- STOP -->
+            <button class="big-btn btn-stop" onclick="emergencyStop()">STOP</button>
+
+            <!-- Set All Home -->
+            <button class="big-btn btn-set-home" onclick="setAllHome()">Set All Motors as Home Position</button>
+        </div>
+    </div>
+
+    <!-- ========== PAGE: Run Pattern ========== -->
+    <div id="page-pattern" class="page">
+        <div class="page-header">
+            <button class="back-btn" onclick="leavePatternPage()">&#8592; Back</button>
+            <h2>Run Pattern</h2>
+        </div>
+
+        <div class="template-info">
+            <div class="template-label">Default Template</div>
+            <div class="template-name" id="templateNameDisplay">Loading...</div>
+        </div>
+
+        <div class="pattern-grid">
+            <div class="card" id="oscConfigCard">
+                <h3>OSC Configuration</h3>
+                <select id="oscMode" onchange="updateOscModeUI()" style="display:none;">
+                    <option value="send">Send</option>
+                    <option value="receive">Receive</option>
+                    <option value="both">Both</option>
+                </select>
+                <div id="oscSendFields">
+                    <div class="input-group">
+                        <label>Send IP:</label>
+                        <input type="text" id="oscSendIp" value="127.0.0.1">
+                    </div>
+                    <div class="input-group">
+                        <label>Send Port:</label>
+                        <input type="number" id="oscSendPort" value="9000">
+                    </div>
+                </div>
+                <div id="oscRecvFields" style="display:none;">
+                    <div class="input-group">
+                        <label>Receive IP:</label>
+                        <input type="text" id="oscRecvIp" value="0.0.0.0">
+                    </div>
+                    <div class="input-group">
+                        <label>Receive Port:</label>
+                        <input type="number" id="oscRecvPort" value="8001">
+                    </div>
+                </div>
+                <div id="oscAddressList" style="margin-top:10px;"></div>
+            </div>
+            <div class="card">
+                <h3>Template Controls</h3>
+                <div class="run-controls">
+                    <button class="big-btn btn-run" onclick="runPattern()" id="runPatternBtn">
+                        <span class="emoji-icon">&#x25B6;</span>Run Template
+                    </button>
+                    <button class="big-btn btn-stop-pattern" onclick="stopPattern()" id="stopPatternBtn" disabled>
+                        <span class="emoji-icon">&#x23F9;</span>Stop Template
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="pattern-status" id="patternStatus"></div>
+    </div>
+
+    <script>
+        // ========================================================
+        // State
+        // ========================================================
+        let ws = null;
+        let reconnectTimer = null;
+        let currentPage = 'main';
+        let numSlaves = 0;
+        let lastNumSlaves = 0;
+        let selectedPillar = -1;    // -1 = none selected
+        let selectedProduct = 'hmrs_slider';
+        let loadedConfig = null;
+        let defaultTemplateName = '';
+        let isPatternRunning = false;
+        let isFirstStatus = true;  // Flag to auto-restore page on first status after connect
+        let hasFault = false;
+        let hadFaultPrev = false;
+        let reconnectGrace = 0;  // Grace period after reconnect - suppress fault edge detection
+        let systemState = 0;
+        let latestStatusWords = [];   // Per-slave status words from last status
+        let latestErrorCodes = [];    // Per-slave error codes from last status
+        let disconnectedCounter = 0;
+        let interfaceOverlayShown = false;
+        let wsFailCount = 0;
+        let oscSendAddresses = ['/template_step', '/composition/layers/1/clips/{v}/connect'];
+
+        // Debug panel state
+        let debugPanelOpen = false;
+        let debugStepTimings = {};
+        let debugCurrentStepIndex = null;
+        let debugStepTimerInterval = null;
+        let debugTemplateSteps = [];
+
+        // ========================================================
+        // LocalStorage Cache - persist UI state across page reloads
+        // ========================================================
+        const CACHE_KEY = 'simpleui_state';
+
+        function saveStateCache() {
+            try {
+                const state = {
+                    currentPage,
+                    loadedConfig,
+                    defaultTemplateName,
+                    isPatternRunning,
+                    debugTemplateSteps
+                };
+                localStorage.setItem(CACHE_KEY, JSON.stringify(state));
+            } catch (e) { /* ignore storage errors */ }
+        }
+
+        function restoreFromCache() {
+            try {
+                const raw = localStorage.getItem(CACHE_KEY);
+                if (!raw) return false;
+                const cached = JSON.parse(raw);
+                if (!cached || !cached.currentPage || cached.currentPage === 'main') return false;
+
+                // Restore page
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById('page-' + cached.currentPage).classList.add('active');
+                currentPage = cached.currentPage;
+
+                // Restore config and template info
+                if (cached.loadedConfig) {
+                    loadedConfig = cached.loadedConfig;
+                    debugTemplateSteps = loadedConfig.template?.steps || [];
+                    const name = loadedConfig.template?.name || cached.defaultTemplateName || '';
+                    defaultTemplateName = cached.defaultTemplateName || '';
+                    const display = document.getElementById('templateNameDisplay');
+                    if (display) display.textContent = name || defaultTemplateName.replace('.json', '') || 'Unknown Template';
+                }
+
+                // Restore pattern running state (will be validated by first status)
+                if (cached.isPatternRunning && currentPage === 'pattern') {
+                    isPatternRunning = true;
+                    updatePatternUI();
+                    setPatternStatus('Template running in loop...', 'running');
+                }
+
+                // Render debug template table immediately from cache
+                updateDebugTemplateTable();
+                return true;
+            } catch (e) { return false; }
+        }
+
+        // ========================================================
+        // Product Configurations (pillar-based)
+        // ========================================================
+        const PRODUCT_CONFIGS = {
+            'hmrs_slider': {
+                slavesPerPillar: 1,
+                roles: ['Movement'],
+                roleSlotCSS: ['movement'],
+                isMatrix: false
+            },
+            'hmrs_both': {
+                slavesPerPillar: 2,
+                roles: ['Rotation', 'Movement'],  // even=rotation(slot0), odd=movement(slot1)
+                roleSlotCSS: ['rotation', 'movement'],
+                isMatrix: false
+            },
+            'matrix_1': {
+                slavesPerPillar: 1,
+                roles: ['Movement'],
+                roleSlotCSS: ['movement'],
+                isMatrix: true
+            },
+            'matrix_2': {
+                slavesPerPillar: 2,
+                roles: ['Row 1', 'Row 2'],
+                roleSlotCSS: ['row1', 'row2'],
+                isMatrix: true
+            },
+            'matrix_3': {
+                slavesPerPillar: 3,
+                roles: ['Row 1', 'Row 2', 'Row 3'],
+                roleSlotCSS: ['row1', 'row2', 'row3'],
+                isMatrix: true
+            }
+        };
+
+        // ========================================================
+        // Pillar & Slave Mapping
+        // ========================================================
+        function getEffectiveSlaveCount() {
+            return numSlaves;
+        }
+
+        function getNumPillars() {
+            const config = PRODUCT_CONFIGS[selectedProduct];
+            const count = getEffectiveSlaveCount();
+            return Math.ceil(count / config.slavesPerPillar);
+        }
+
+        function getSlaveIndex(pillarIdx, roleIdx) {
+            const config = PRODUCT_CONFIGS[selectedProduct];
+            return pillarIdx * config.slavesPerPillar + roleIdx;
+        }
+
+        function getSelectedRoleIndex() {
+            const config = PRODUCT_CONFIGS[selectedProduct];
+            const movementType = document.getElementById('movementTypeSelect').value;
+            return config.roles.indexOf(movementType);
+        }
+
+        function getTargetSlaveIndex() {
+            if (selectedPillar < 0) return -1;
+            const roleIdx = getSelectedRoleIndex();
+            if (roleIdx < 0) return -1;
+            const slaveIdx = getSlaveIndex(selectedPillar, roleIdx);
+            const count = getEffectiveSlaveCount();
+            return slaveIdx < count ? slaveIdx : -1;
+        }
+
+        // ========================================================
+        // Pillar Layout Rendering
+        // ========================================================
+        function updatePillarLayout() {
+            const container = document.getElementById('pillarRow');
+            if (!container) return;
+
+            const config = PRODUCT_CONFIGS[selectedProduct];
+            const count = getEffectiveSlaveCount();
+            const numPillars = getNumPillars();
+            const roleIdx = getSelectedRoleIndex();
+            const isHMRS = !config.isMatrix;
+
+            if (count === 0) {
+                container.innerHTML = '<div class="no-pillars">No motors connected</div>';
+                return;
+            }
+
+            let html = '';
+            for (let p = 0; p < numPillars; p++) {
+                const isSelected = (p === selectedPillar);
+
+                if (isHMRS) {
+                    // HMRS: single combined button per pillar showing active motor
+                    const activeSlaveIdx = getSlaveIndex(p, roleIdx >= 0 ? roleIdx : 0);
+                    if (activeSlaveIdx >= count) continue;
+                    const roleName = config.roles[roleIdx >= 0 ? roleIdx : 0] || '';
+                    const cssClass = config.roleSlotCSS[roleIdx >= 0 ? roleIdx : 0] || '';
+
+                    html += `<div class="pillar pillar-compact ${isSelected ? 'selected' : ''}" onclick="selectPillar(${p})">`;
+                    html += `<div class="pillar-label">Pillar ${p + 1}</div>`;
+                    html += `<div class="pillar-slots">`;
+                    html += `<div class="pillar-slot slot-${cssClass} ${isSelected ? 'target' : ''}"
+                                 title="Motor ${activeSlaveIdx} (${roleName})">
+                                Pillar ${p + 1} (Motor ${activeSlaveIdx})
+                             </div>`;
+                    html += '</div></div>';
+                } else {
+                    // Matrix: show stacked rows per pillar
+                    html += `<div class="pillar ${isSelected ? 'selected' : ''}" onclick="selectPillar(${p})">`;
+                    html += `<div class="pillar-label">Pillar ${p + 1}</div>`;
+                    html += `<div class="pillar-slots">`;
+
+                    for (let r = 0; r < config.slavesPerPillar; r++) {
+                        const slaveIdx = getSlaveIndex(p, r);
+                        if (slaveIdx >= count) break;
+
+                        const cssClass = config.roleSlotCSS[r] || '';
+                        const isActiveSlot = (r === roleIdx);
+                        const isTarget = isSelected && isActiveSlot;
+
+                        html += `<div class="pillar-slot slot-${cssClass} ${isTarget ? 'target' : ''}"
+                                     title="Motor ${slaveIdx} (${config.roles[r]})">
+                                    Motor ${slaveIdx}
+                                 </div>`;
+                    }
+
+                    html += '</div></div>';
+                }
+            }
+
+            container.innerHTML = html;
+        }
+
+        function selectPillar(index) {
+            selectedPillar = (selectedPillar === index) ? -1 : index; // toggle
+            updatePillarLayout();
+            updatePillarHint();
+        }
+
+        // ========================================================
+        // Movement Type & Direction Labels
+        // ========================================================
+        function updateMovementTypeDropdown() {
+            const config = PRODUCT_CONFIGS[selectedProduct];
+            const select = document.getElementById('movementTypeSelect');
+            select.innerHTML = config.roles.map(r =>
+                `<option value="${r}">${r}</option>`
+            ).join('');
+        }
+
+        function updateDirectionLabels() {
+            const config = PRODUCT_CONFIGS[selectedProduct];
+            const btnLeft = document.getElementById('btnLeft');
+            const btnRight = document.getElementById('btnRight');
+            if (config.isMatrix) {
+                btnLeft.innerHTML = '&#9650; UP';
+                btnRight.innerHTML = 'DOWN &#9660;';
+            } else {
+                btnLeft.innerHTML = '&#9664; LEFT';
+                btnRight.innerHTML = 'RIGHT &#9654;';
+            }
+        }
+
+        function onMovementTypeChange() {
+            updatePillarLayout();
+        }
+
+        const PRODUCT_LABELS = {
+            'hmrs_slider': 'HMRS: Slider',
+            'hmrs_both': 'HMRS: Movement & Rotation',
+            'matrix_1': 'Matrix: One Motor Per Pillar',
+            'matrix_2': 'Matrix: Two Motor Per Pillar',
+            'matrix_3': 'Matrix: Three Motor Per Pillar'
+        };
+
+        function setProduct(productKey) {
+            selectedProduct = productKey;
+            selectedPillar = -1;
+            const display = document.getElementById('productDisplay');
+            if (display) display.textContent = PRODUCT_LABELS[productKey] || productKey;
+            updateMovementTypeDropdown();
+            updateDirectionLabels();
+            updatePillarLayout();
+        }
+
+        async function fetchProduct() {
+            try {
+                const resp = await fetch('/api/product');
+                const data = await resp.json();
+                setProduct(data.product || 'hmrs_slider');
+            } catch (e) {
+                setProduct('hmrs_slider');
+            }
+        }
+
+        // ========================================================
+        // Velocity Control
+        // ========================================================
+        function startVelocity(direction) {
+            const slaveIdx = getTargetSlaveIndex();
+            if (slaveIdx < 0) {
+                flashPillarHint();
+                return;
+            }
+
+            const speed = 1000;
+            const cmd = direction === 'forward' ? 'velocity_forward' : 'velocity_backward';
+            sendCmd(cmd, { slave: slaveIdx, speed: speed });
+        }
+
+        function flashPillarHint() {
+            const hint = document.getElementById('pillarHint');
+            if (!hint) return;
+            hint.textContent = 'Please select a pillar first!';
+            hint.classList.remove('flash');
+            void hint.offsetWidth; // force reflow for re-animation
+            hint.classList.add('flash');
+            setTimeout(() => {
+                hint.classList.remove('flash');
+                updatePillarHint();
+            }, 1500);
+        }
+
+        function updatePillarHint() {
+            const hint = document.getElementById('pillarHint');
+            if (!hint) return;
+            if (selectedPillar >= 0) {
+                hint.textContent = `Pillar ${selectedPillar + 1} selected`;
+                hint.style.color = 'var(--blue)';
+            } else {
+                hint.textContent = 'Select a pillar to control';
+                hint.style.color = '';
+            }
+        }
+
+        function stopVelocity() {
+            sendCmd('velocity_stop', { slave: 'all' });
+        }
+
+        function emergencyStop() {
+            sendCmd('stop');
+            if (isPatternRunning) {
+                isPatternRunning = false;
+                updatePatternUI();
+            }
+        }
+
+        function setAllHome() {
+            sendCmd('set_home_all');
+            // Disable drives and go back to main
+            setTimeout(() => {
+                sendCmd('disable');
+                showPage('main');
+                showToast('Home position set successfully!');
+            }, 300);
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toastNotification');
+            if (!toast) return;
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        // ========================================================
+        // WebSocket
+        // ========================================================
+        function connectWS() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws?page=simpleui`;
+
+            try { ws = new WebSocket(wsUrl); } catch (e) { return; }
+
+            ws.onopen = () => {
+                if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+                wsFailCount = 0;
+                isFirstStatus = true;  // Re-check state on reconnect
+                reconnectGrace = 5;  // Suppress fault edge detection for 5 cycles (~250ms) after reconnect
+            };
+
+            ws.onclose = () => {
+                updateConnectionUI(0);
+                wsFailCount++;
+                // If server is gone (multiple failed reconnects), close the tab
+                if (wsFailCount >= 5) {
+                    try { window.close(); } catch(e) {}
+                    // Fallback: show message if window.close() is blocked by browser
+                    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:Nunito,sans-serif;color:#7c82a0;font-size:1.2rem;font-weight:700;text-align:center;padding:40px;">Server disconnected.<br>You can close this tab.</div>';
+                    return;
+                }
+                if (!reconnectTimer) {
+                    reconnectTimer = setTimeout(() => { reconnectTimer = null; connectWS(); }, 2000);
+                }
+            };
+
+            ws.onerror = () => {};
+
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === 'status') updateStatus(msg.data);
+                    else if (msg.type === 'response') handleResponse(msg.data);
+                } catch (e) {}
+            };
+        }
+
+        function sendCmd(cmd, data = null) {
+            if (cmd === 'stop' || cmd === 'disable') {
+                console.warn(`[sendCmd] ${cmd} called from:`, new Error().stack);
+            }
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ cmd, data }));
+            }
+        }
+
+        // ========================================================
+        // Status Updates
+        // ========================================================
+        function updateStatus(status) {
+            const newNumSlaves = status.num_slaves || 0;
+            systemState = status.state || 0;
+            latestStatusWords = status.status_words || [];
+            latestErrorCodes = status.error_codes || [];
+
+            // Auto-restore page on first status after page load/reconnect
+            if (isFirstStatus) {
+                isFirstStatus = false;
+                const cacheRestored = (currentPage !== 'main');  // restoreFromCache already ran
+
+                if (status.state === 2 && !status.has_fault) {
+                    if (!cacheRestored) {
+                        // No cache - restore from backend status
+                        if (status.mode === 3) {
+                            restorePage('home');
+                        } else if (status.mode === 1) {
+                            restorePage('pattern', status.template_filename || '');
+                        }
+                    }
+                    // Validate/sync running state from backend
+                    if (status.template_running && !isPatternRunning && currentPage === 'pattern') {
+                        isPatternRunning = true;
+                        updatePatternUI();
+                        setPatternStatus('Template running in loop...', 'running');
+                        saveStateCache();
+                    } else if (!status.template_running && isPatternRunning) {
+                        // Template stopped while page was closed
+                        isPatternRunning = false;
+                        updatePatternUI();
+                        setPatternStatus('Template stopped.', 'stopped');
+                        saveStateCache();
+                    }
+                } else if (cacheRestored) {
+                    // Backend is not enabled but cache put us on a page - go back to main
+                    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                    document.getElementById('page-main').classList.add('active');
+                    currentPage = 'main';
+                    isPatternRunning = false;
+                    saveStateCache();
+                }
+            }
+
+            // Use backend-computed has_fault (checks fault bit + known error code)
+            hasFault = !!status.has_fault;
+
+            updateConnectionUI(systemState, status.moving);
+
+            if (newNumSlaves !== lastNumSlaves) {
+                lastNumSlaves = newNumSlaves;
+                numSlaves = newNumSlaves;
+                document.getElementById('slaveBadge').textContent = numSlaves > 0 ? `${numSlaves} motor${numSlaves > 1 ? 's' : ''}` : '';
+                updatePillarLayout();
+            }
+
+            const resetBtn = document.getElementById('resetErrorBtn');
+            if (resetBtn) resetBtn.style.display = hasFault ? 'block' : 'none';
+
+            // Disable home/pattern buttons when fault is active
+            const btnHome = document.getElementById('btnSetHome');
+            const btnPattern = document.getElementById('btnRunPattern');
+            if (btnHome) btnHome.disabled = hasFault;
+            if (btnPattern) btnPattern.disabled = hasFault;
+
+            // On new real fault: navigate to main page (where reset button is)
+            // Backend handles stopping the template - we do NOT send 'stop' from frontend.
+            if (reconnectGrace > 0) {
+                reconnectGrace--;
+                hadFaultPrev = hasFault;
+            } else if (hasFault && !hadFaultPrev) {
+                console.warn('[FAULT] Real fault detected, navigating to main page. SW:', latestStatusWords.map(w => '0x' + w.toString(16)));
+                // Update pattern state (backend already stopped it)
+                isPatternRunning = false;
+                updatePatternUI();
+                debugStopStepTimer();
+                // Navigate to main page so user sees the reset button
+                if (currentPage !== 'main') {
+                    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                    document.getElementById('page-main').classList.add('active');
+                    currentPage = 'main';
+                    updateDebugTemplateTable();
+                }
+                saveStateCache();
+            }
+            hadFaultPrev = hasFault;
+
+            // Interface selection: detect persistent disconnection
+            if (status.state === 0 && (status.num_slaves || 0) === 0) {
+                disconnectedCounter++;
+                if (disconnectedCounter >= 10 && !interfaceOverlayShown) {
+                    showInterfaceOverlay();
+                }
+            } else {
+                disconnectedCounter = 0;
+                if (interfaceOverlayShown) {
+                    hideInterfaceOverlay();
+                }
+            }
+
+            // Debug panel slave table update
+            updateDebugSlaveTable(status);
+        }
+
+        function updateConnectionUI(state, moving) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+
+            dot.className = 'status-dot';
+            if (hasFault) {
+                dot.classList.add('fault');
+                text.textContent = 'Something went wrong!';
+                text.style.color = 'var(--red)';
+            } else if (state === 0) {
+                dot.classList.add('disconnected');
+                text.textContent = 'Not connected';
+                text.style.color = 'var(--text-light)';
+            } else if (state === 1) {
+                dot.classList.add('connected');
+                text.textContent = 'Connected';
+                text.style.color = 'var(--blue)';
+            } else if (state === 2) {
+                if (moving) {
+                    dot.classList.add('moving');
+                    text.textContent = 'Moving!';
+                    text.style.color = 'var(--green)';
+                } else {
+                    dot.classList.add('enabled');
+                    text.textContent = 'Ready';
+                    text.style.color = 'var(--green)';
+                }
+            }
+        }
+
+        // ========================================================
+        // Response Handler
+        // ========================================================
+        function handleResponse(resp) {
+            // Handle reset/clear_error responses
+            if (resetInProgress && handleResetResponse(resp)) return;
+
+            if (resp.data && resp.data.config) {
+                loadedConfig = resp.data.config;
+                const name = loadedConfig.template?.name || defaultTemplateName;
+                const display = document.getElementById('templateNameDisplay');
+                if (display) display.textContent = name || 'Unknown Template';
+
+                // Debug: cache template steps and render table
+                debugTemplateSteps = loadedConfig.template?.steps || [];
+                debugResetStepTimings();
+                updateDebugTemplateTable();
+                saveStateCache();
+            }
+
+            // Debug: handle template_start
+            if (resp.data && resp.data.template_start) {
+                debugResetStepTimings();
+            }
+
+            // Debug: handle template_step events
+            if (resp.data && resp.data.template_step) {
+                const step = resp.data.template_step;
+                if (step.event === 'start') {
+                    debugStartStep(step.index);
+                    if (step.move_order && step.move_order.length > 0) {
+                        debugUpdateMoveOrder(step.index, step.move_order, step.is_spreading);
+                    }
+                } else if (step.event === 'complete') {
+                    debugCompleteStep(step.index, step.time_taken || 0);
+                }
+            }
+
+            if (resp.data && resp.data.template_complete) {
+                // loop continues automatically
+                debugStopStepTimer();
+            }
+
+            // Handle template error/fault from backend
+            if (resp.data && resp.data.template_error) {
+                const error = resp.data.template_error;
+                debugStopStepTimer();
+                if (isPatternRunning) {
+                    isPatternRunning = false;
+                    updatePatternUI();
+                    saveStateCache();
+                }
+                setPatternStatus(error.reason || resp.message || 'Template error', 'stopped');
+                // Reload page so home shows fresh with reset button
+                location.reload();
+            }
+
+            // Handle recovery success (from reset that triggered reconnect)
+            if (resp.data && resp.data.recovery_success !== undefined) {
+                if (resp.data.recovery_success) {
+                    // Recovery worked - clear fault state so UI updates
+                    hasFault = false;
+                    hadFaultPrev = false;
+                    showToast('Fault is reset, you can continue by selecting any option.');
+                } else {
+                    showToast('Reset failed - try restarting the program.');
+                }
+            }
+
+            // Handle user-initiated stop broadcast
+            if (resp.data && resp.data.template_stop) {
+                debugStopStepTimer();
+                if (isPatternRunning) {
+                    isPatternRunning = false;
+                    updatePatternUI();
+                    setPatternStatus('Template stopped.', 'stopped');
+                    saveStateCache();
+                }
+            }
+
+            if (resp.message && (resp.message.includes('STOP') || resp.message.includes('stopped'))) {
+                if (isPatternRunning) {
+                    isPatternRunning = false;
+                    updatePatternUI();
+                    saveStateCache();
+                }
+                debugStopStepTimer();
+            }
+        }
+
+        // ========================================================
+        // Page Navigation
+        // ========================================================
+        function showPage(page) {
+            // Disable drives when leaving home or pattern page back to main
+            if (page === 'main' && (currentPage === 'home' || currentPage === 'pattern')) {
+                sendCmd('disable');
+            }
+
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-' + page).classList.add('active');
+            currentPage = page;
+
+            if (page === 'home') enterHomePage();
+            else if (page === 'pattern') enterPatternPage();
+
+            updateDebugTemplateTable();
+            saveStateCache();
+        }
+
+        // Restore page on reconnect without re-sending mode/enable commands
+        async function restorePage(page, templateFilename) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-' + page).classList.add('active');
+            currentPage = page;
+
+            // Load UI data only (no mode/enable commands)
+            if (page === 'pattern') {
+                // Use provided filename from backend status, or fetch default
+                let filename = templateFilename;
+                if (!filename) {
+                    await fetchDefaultTemplate();
+                    filename = defaultTemplateName;
+                } else {
+                    defaultTemplateName = filename;
+                    const display = document.getElementById('templateNameDisplay');
+                    if (display) display.textContent = filename.replace('.json', '');
+                }
+                if (filename) {
+                    sendCmd('load_config', { filename: filename });
+                }
+                loadOscConfig();
+            }
+
+            updateDebugTemplateTable();
+        }
+
+        // ========================================================
+        // Set Home Positions Page
+        // ========================================================
+        function enterHomePage() {
+            sendCmd('set_mode', {
+                mode: 3,
+                speed: { velocity: 1000, acceleration: 500, deceleration: 500, mode_type: 'PV' }
+            });
+            setTimeout(() => sendCmd('enable'), 300);
+        }
+
+        // ========================================================
+        // Run Pattern Page
+        // ========================================================
+        async function enterPatternPage() {
+            sendCmd('set_mode', {
+                mode: 1,
+                speed: { velocity: 80000, acceleration: 40000, deceleration: 40000, mode_type: 'PP' }
+            });
+            setTimeout(() => sendCmd('enable'), 300);
+
+            await fetchDefaultTemplate();
+            if (defaultTemplateName) {
+                sendCmd('load_config', { filename: defaultTemplateName });
+            }
+            loadOscConfig();
+        }
+
+        // ========================================================
+        // OSC Config
+        // ========================================================
+        function updateOscModeUI() {
+            const mode = document.getElementById('oscMode').value;
+            document.getElementById('oscSendFields').style.display = (mode === 'send' || mode === 'both') ? '' : 'none';
+            document.getElementById('oscRecvFields').style.display = (mode === 'receive' || mode === 'both') ? '' : 'none';
+        }
+
+        async function loadOscConfig() {
+            try {
+                const resp = await fetch('/api/config');
+                const cfg = await resp.json();
+                const osc = cfg.osc || {};
+
+                // Set mode
+                const modeEl = document.getElementById('oscMode');
+                if (osc.osc_mode && ['send', 'receive', 'both'].includes(osc.osc_mode)) {
+                    modeEl.value = osc.osc_mode;
+                }
+                updateOscModeUI();
+
+                // Set IPs and ports
+                if (osc.send_ip) document.getElementById('oscSendIp').value = osc.send_ip;
+                if (osc.send_port) document.getElementById('oscSendPort').value = osc.send_port;
+                if (osc.recv_ip) document.getElementById('oscRecvIp').value = osc.recv_ip;
+                if (osc.recv_port) document.getElementById('oscRecvPort').value = osc.recv_port;
+
+                // Set address list
+                if (osc.osc_send_address && Array.isArray(osc.osc_send_address)) {
+                    oscSendAddresses = osc.osc_send_address;
+                }
+                renderOscAddressList();
+            } catch (e) {}
+        }
+
+        function renderOscAddressList() {
+            const container = document.getElementById('oscAddressList');
+            if (!container || oscSendAddresses.length === 0) {
+                if (container) container.innerHTML = '';
+                return;
+            }
+            let html = '<div class="osc-addr-list"><div class="osc-addr-title">Send Addresses:</div>';
+            for (const addr of oscSendAddresses) {
+                html += `<div class="osc-addr-item">${addr}</div>`;
+            }
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function leavePatternPage() {
+            if (isPatternRunning) stopPattern();
+            showPage('main');
+        }
+
+        async function fetchDefaultTemplate() {
+            try {
+                const resp = await fetch('/api/default_template');
+                const data = await resp.json();
+                defaultTemplateName = data.default_template || '';
+                const display = document.getElementById('templateNameDisplay');
+                if (display) {
+                    display.textContent = defaultTemplateName
+                        ? defaultTemplateName.replace('.json', '')
+                        : 'No default template set (configure in Developer Mode)';
+                }
+            } catch (e) {
+                const display = document.getElementById('templateNameDisplay');
+                if (display) display.textContent = 'Error loading template';
+            }
+        }
+
+        function runPattern() {
+            if (!loadedConfig) {
+                setPatternStatus('No template loaded. Set a default template in Developer Mode.', 'stopped');
+                return;
+            }
+
+            const modeStr = document.getElementById('oscMode').value;
+            const modeMap = { send: 2, receive: 1, both: 3 };
+            const oscMode = modeMap[modeStr] || 2;
+            const sendIp = document.getElementById('oscSendIp').value;
+            const sendPort = parseInt(document.getElementById('oscSendPort').value);
+            const recvIp = document.getElementById('oscRecvIp').value;
+            const recvPort = parseInt(document.getElementById('oscRecvPort').value);
+
+            // Determine which addresses to send based on config list
+            const addrList = oscSendAddresses;
+            const sendTemplate = addrList.some(a => a.includes('template_step'));
+            const sendClipConnect = addrList.some(a => a.includes('clips') && a.includes('connect'));
+            const sendMovement = addrList.some(a => a.includes('movement'));
+
+            sendCmd('osc_connect', {
+                send_ip: sendIp,
+                send_port: sendPort,
+                recv_ip: recvIp,
+                recv_port: recvPort,
+                mode: oscMode,
+                send_movement: sendMovement,
+                send_template: sendTemplate,
+                send_clip_connect: sendClipConnect,
+                osc_send_address: addrList
+            });
+
+            setTimeout(() => {
+                sendCmd('template_loop', { config: loadedConfig });
+                isPatternRunning = true;
+                updatePatternUI();
+                setPatternStatus('Template running in loop...', 'running');
+                saveStateCache();
+            }, 500);
+        }
+
+        function stopPattern() {
+            sendCmd('stop');
+            setTimeout(() => sendCmd('osc_disconnect'), 200);
+            isPatternRunning = false;
+            updatePatternUI();
+            setPatternStatus('Template stopped.', 'stopped');
+            saveStateCache();
+        }
+
+        function updatePatternUI() {
+            document.getElementById('runPatternBtn').disabled = isPatternRunning;
+            document.getElementById('stopPatternBtn').disabled = !isPatternRunning;
+            // Disable OSC inputs while template is running
+            document.querySelectorAll('#oscConfigCard input, #oscConfigCard select').forEach(el => el.disabled = isPatternRunning);
+        }
+
+        function setPatternStatus(text, type) {
+            const el = document.getElementById('patternStatus');
+            el.textContent = text;
+            el.className = 'pattern-status ' + (type || '');
+        }
+
+        // ========================================================
+        // Reset Error - Smart per-slave error handling
+        // ========================================================
+        const ER153_CODE = 0x7325;  // Multiturn encoder error - needs special handling
+        let resetInProgress = false;
+        let resetPendingCount = 0;
+        let resetResults = [];      // { slave, success, message }
+
+        async function resetError() {
+            if (resetInProgress) return;
+
+            // Identify faulted slaves and their error codes
+            const faultedSlaves = [];
+            for (let i = 0; i < latestStatusWords.length; i++) {
+                const sw = latestStatusWords[i] || 0;
+                if ((sw & 0x0008) || (sw === 0 && systemState >= 1)) {
+                    faultedSlaves.push({
+                        index: i,
+                        errorCode: latestErrorCodes[i] || 0,
+                        errorName: getErrorDisplay(latestErrorCodes[i] || 0)
+                    });
+                }
+            }
+
+            if (faultedSlaves.length === 0) {
+                showToast('No faults detected');
+                return;
+            }
+
+            // Separate Er153 slaves (need special SDO procedure) from others
+            const er153Slaves = faultedSlaves.filter(s => s.errorCode === ER153_CODE);
+            const otherSlaves = faultedSlaves.filter(s => s.errorCode !== ER153_CODE);
+
+            const btn = document.getElementById('resetErrorBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.querySelector('.emoji-icon').textContent = '\u23F3';  // hourglass
+            }
+
+            resetInProgress = true;
+            resetResults = [];
+            // Expected responses: 1 clear_error per Er153 slave + 1 bulk reset at the end
+            resetPendingCount = er153Slaves.length + 1;
+
+            showToast(`Resetting ${faultedSlaves.length} slave(s)...`);
+
+            // Phase 1: Handle Er153 slaves first (special Pr0.15 SDO procedure, takes ~4s each)
+            for (const slave of er153Slaves) {
+                console.log(`[Reset] Phase 1 - Slave #${slave.index}: ${slave.errorName} (Er153 special handling)`);
+                sendCmd('clear_error', { slave: slave.index });
+                // Delay between commands so backend processes sequentially
+                await new Promise(r => setTimeout(r, 100));
+            }
+
+            // Phase 2: Bulk reset handles everything else (Er81b, Er102, etc.)
+            // - For Er81b/communication errors: reset_all + reconnect recovery
+            // - For already-cleared Er153 slaves: harmless re-check
+            // - For standard drive faults: controlword 0x80 reset
+            if (er153Slaves.length > 0) {
+                // Wait for Er153 clear_error responses before sending reset
+                // Er153 takes ~4s per slave; wait enough time then send reset
+                const waitMs = er153Slaves.length * 5000 + 500;
+                console.log(`[Reset] Phase 2 - Waiting ${waitMs}ms for Er153 handling, then sending bulk reset`);
+                setTimeout(() => sendCmd('reset'), waitMs);
+            } else {
+                console.log(`[Reset] No Er153 - sending bulk reset directly`);
+                sendCmd('reset');
+            }
+
+            // Safety timeout: clean up if responses never arrive
+            const totalTimeout = (er153Slaves.length * 6000) + 10000;
+            setTimeout(() => {
+                if (resetInProgress) {
+                    resetInProgress = false;
+                    resetPendingCount = 0;
+                    const btn = document.getElementById('resetErrorBtn');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.querySelector('.emoji-icon').textContent = '\uD83D\uDD27';
+                    }
+                    showToast('Reset timed out. Try again or power cycle drives.');
+                }
+            }, totalTimeout);
+        }
+
+        function handleResetResponse(resp) {
+            if (!resetInProgress) return false;
+
+            resetResults.push({
+                success: resp.success,
+                message: resp.message || ''
+            });
+            resetPendingCount--;
+
+            if (resetPendingCount <= 0) {
+                // All responses received
+                resetInProgress = false;
+                const btn = document.getElementById('resetErrorBtn');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.querySelector('.emoji-icon').textContent = '\uD83D\uDD27';  // wrench
+                }
+
+                const allSuccess = resetResults.every(r => r.success);
+                const homingNeeded = resetResults.some(r => r.message && r.message.includes('HOMING'));
+                const anyFailed = resetResults.some(r => !r.success);
+
+                if (allSuccess && homingNeeded) {
+                    showToast('Error cleared! Homing required before operation.');
+                } else if (allSuccess) {
+                    hasFault = false;
+                    hadFaultPrev = false;
+                    showToast('All faults cleared successfully.');
+                } else if (anyFailed) {
+                    const failMsgs = resetResults.filter(r => !r.success).map(r => r.message);
+                    showToast(failMsgs[0] || 'Some errors could not be cleared. Try power cycling.');
+                }
+            }
+            return true;
+        }
+
+        // ========================================================
+        // Debug Panel
+        // ========================================================
+        function toggleDebugPanel() {
+            debugPanelOpen = !debugPanelOpen;
+            const panel = document.getElementById('debugPanel');
+            const btn = document.getElementById('debugToggleBtn');
+            if (debugPanelOpen) {
+                panel.classList.add('show');
+                btn.classList.add('active');
+            } else {
+                panel.classList.remove('show');
+                btn.classList.remove('active');
+            }
+        }
+
+        const ERROR_MAP = {
+            0x3150:'Overcurrent A (Er0A0)', 0x3151:'Overcurrent B (Er0A1)', 0x3153:'Motor cable (Er0A3)',
+            0x3206:'Power high (Er0b1)', 0x3211:'Bus overvolt (Er0C0)', 0x3221:'Bus undervolt (Er0d0)',
+            0x3130:'Single phase (Er0d1)', 0x3222:'No main power (Er0d2)',
+            0x2211:'Overcurrent (Er0E0)', 0x2212:'IPM overcurrent (Er0E1)',
+            0x2218:'Ground short (Er0E2)', 0x2230:'Phase overcurrent (Er0E4)',
+            0x4210:'Overheat (Er0f0)', 0x8311:'Motor overload (Er100)', 0x8310:'Driver overload (Er101)',
+            0x8301:'Rotor blocked (Er102)',
+            0x7701:'Regen overvolt (Er120)', 0x7702:'Brake error (Er121)',
+            0x7321:'Encoder disconnected (Er150)', 0x7322:'Encoder comm (Er151)',
+            0x7323:'Encoder init (Er152)', 0x7325:'Multiturn (Er153)',
+            0x7326:'Encoder overflow (Er155)', 0x7327:'Encoder overheat (Er156)',
+            0x7328:'Encoder count (Er157)', 0x7324:'Encoder data (Er170)',
+            0x8611:'Position deviation (Er180)', 0x8401:'Vibration (Er190)',
+            0x8402:'Overspeed (Er1A0)', 0x8403:'Velocity (Er1A1)',
+            0x8313:'STO failed (Er1c0)',
+            0x5530:'EEPROM init (Er240)', 0x5531:'EEPROM hw (Er241)',
+            0x7329:'Limit triggered (Er260)',
+            0x5441:'Quick stop (Er570)', 0x7122:'Motor detect (Er5f0)',
+            0x6204:'Loop timeout (Er600)',
+            0x873A:'SM2 lost (Er73A)', 0x873B:'SYNC0 lost (Er73b)', 0x873C:'DC error (Er73c)',
+            0x8201:'Comm error (Er801)',
+            0x821B:'Timeout (Er81b)', 0x821C:'Invalid SM (Er81C)',
+            0x821D:'Invalid output (Er81d)', 0x821E:'Invalid input (Er81E)',
+            0x872C:'DC watchdog (Er82c)', 0x872D:'No sync (Er82d)',
+            0x5550:'EEPROM access (Er850)', 0x5551:'EEPROM error (Er851)'
+        };
+        function getErrorDisplay(errCode) {
+            return ERROR_MAP[errCode] || ('Er' + errCode.toString(16).toUpperCase());
+        }
+
+        function updateDebugSlaveTable(status) {
+            if (!debugPanelOpen) return;
+            const tbody = document.getElementById('debugSlaveTableBody');
+            if (!tbody) return;
+
+            const positions = status.positions || [];
+            const statusWords = status.status_words || [];
+            const errorCodes = status.error_codes || [];
+            const globalState = status.state || 0;
+
+            if (positions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="debug-empty">No motors connected</td></tr>';
+                return;
+            }
+
+            // Rebuild rows if slave count changed
+            if (!document.getElementById('dbg-pos-0') || tbody.children.length !== positions.length) {
+                let html = '';
+                for (let i = 0; i < positions.length; i++) {
+                    html += `<tr>
+                        <td style="font-weight:800; color:var(--text-light);">#${i}</td>
+                        <td id="dbg-pos-${i}" style="font-variant-numeric:tabular-nums;"></td>
+                        <td id="dbg-sw-${i}"></td>
+                    </tr>`;
+                }
+                tbody.innerHTML = html;
+            }
+
+            // Update values
+            for (let i = 0; i < positions.length; i++) {
+                const pos = positions[i].toFixed(4);
+                const sw = statusWords[i] || 0;
+                const errCode = errorCodes[i] || 0;
+                const enabled = (sw & 0x006F) === 0x0027;
+                const fault = (sw & 0x0008) !== 0;
+
+                const posEl = document.getElementById(`dbg-pos-${i}`);
+                if (posEl && posEl.textContent !== pos) posEl.textContent = pos;
+
+                const swEl = document.getElementById(`dbg-sw-${i}`);
+                if (swEl) {
+                    let dotClass = 'off', statusText = 'Off';
+                    if (fault) {
+                        dotClass = 'fault';
+                        statusText = errCode ? getErrorDisplay(errCode) : 'Fault';
+                    }
+                    else if (enabled) { dotClass = 'ok'; statusText = 'Enabled'; }
+                    else if (globalState >= 1) { dotClass = 'disabled'; statusText = 'Disabled'; }
+                    const stateKey = dotClass + '-' + statusText;
+                    if (swEl.dataset.state !== stateKey) {
+                        swEl.dataset.state = stateKey;
+                        swEl.innerHTML = `<span class="debug-status-dot ${dotClass}"></span>${statusText}`;
+                    }
+                }
+            }
+        }
+
+        function updateDebugTemplateTable() {
+            const section = document.getElementById('debugTemplateSection');
+            const tbody = document.getElementById('debugTemplateTableBody');
+            if (!section || !tbody) return;
+
+            const showTemplate = (currentPage === 'pattern') && debugTemplateSteps.length > 0;
+            section.style.display = showTemplate ? 'block' : 'none';
+            if (!showTemplate) return;
+
+            let html = '';
+            debugTemplateSteps.forEach((step, i) => {
+                const stepIndex = i + 1;
+                const timing = debugStepTimings[stepIndex];
+                let timeDisplay = '---';
+                let timeClass = '';
+                if (timing && timing.elapsed !== undefined) {
+                    timeDisplay = timing.elapsed.toFixed(1) + 's';
+                    timeClass = timing.final ? 'done' : 'running';
+                }
+                html += `<tr id="dbg-step-row-${stepIndex}">
+                    <td style="font-weight:800; color:var(--text-light);">${stepIndex}</td>
+                    <td>${step.name || 'Step ' + stepIndex}</td>
+                    <td id="dbg-step-order-${stepIndex}" style="color:var(--text-light);">---</td>
+                    <td class="debug-step-time ${timeClass}" id="dbg-step-time-${stepIndex}">${timeDisplay}</td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+
+            // Re-apply active highlight
+            if (debugCurrentStepIndex) {
+                const activeRow = document.getElementById(`dbg-step-row-${debugCurrentStepIndex}`);
+                if (activeRow) activeRow.classList.add('debug-step-active');
+            }
+        }
+
+        function debugStartStep(stepIndex) {
+            debugStopStepTimer();
+            debugCurrentStepIndex = stepIndex;
+            debugStepTimings[stepIndex] = { startTime: Date.now(), elapsed: 0, final: false };
+
+            document.querySelectorAll('.debug-step-active').forEach(r => r.classList.remove('debug-step-active'));
+            const row = document.getElementById(`dbg-step-row-${stepIndex}`);
+            if (row) row.classList.add('debug-step-active');
+
+            const timeCell = document.getElementById(`dbg-step-time-${stepIndex}`);
+            if (timeCell) { timeCell.className = 'debug-step-time running'; timeCell.textContent = '0.0s'; }
+
+            debugStepTimerInterval = setInterval(() => {
+                if (debugStepTimings[stepIndex]) {
+                    const elapsed = (Date.now() - debugStepTimings[stepIndex].startTime) / 1000;
+                    debugStepTimings[stepIndex].elapsed = elapsed;
+                    const cell = document.getElementById(`dbg-step-time-${stepIndex}`);
+                    if (cell) cell.textContent = elapsed.toFixed(1) + 's';
+                }
+            }, 100);
+        }
+
+        function debugCompleteStep(stepIndex, totalTime) {
+            debugStopStepTimer();
+            debugStepTimings[stepIndex] = { elapsed: totalTime, final: true };
+
+            const timeCell = document.getElementById(`dbg-step-time-${stepIndex}`);
+            if (timeCell) { timeCell.className = 'debug-step-time done'; timeCell.textContent = totalTime.toFixed(1) + 's'; }
+
+            const row = document.getElementById(`dbg-step-row-${stepIndex}`);
+            if (row) { row.classList.remove('debug-step-active'); row.classList.add('debug-step-complete'); }
+            debugCurrentStepIndex = null;
+        }
+
+        function debugStopStepTimer() {
+            if (debugStepTimerInterval) { clearInterval(debugStepTimerInterval); debugStepTimerInterval = null; }
+        }
+
+        function debugUpdateMoveOrder(stepIndex, moveOrder, isSpreading) {
+            const cell = document.getElementById(`dbg-step-order-${stepIndex}`);
+            if (!cell) return;
+            if (!moveOrder || moveOrder.length === 0) {
+                cell.textContent = '---';
+                cell.style.color = 'var(--text-light)';
+                return;
+            }
+            const orderStr = moveOrder.map(s => s + 1).join('\u2192');
+            cell.innerHTML = `<span style="color:var(--blue);">${isSpreading ? '\u2194' : '\u2192'}</span> ${orderStr}`;
+            cell.style.color = 'var(--text)';
+        }
+
+        function debugResetStepTimings() {
+            debugStopStepTimer();
+            debugStepTimings = {};
+            debugCurrentStepIndex = null;
+            updateDebugTemplateTable();
+        }
+
+        // ========================================================
+        // Interface Selection Overlay
+        // ========================================================
+        function showInterfaceOverlay() {
+            interfaceOverlayShown = true;
+            document.getElementById('interfaceOverlay').classList.add('show');
+            scanInterfaces();
+        }
+
+        function hideInterfaceOverlay() {
+            interfaceOverlayShown = false;
+            document.getElementById('interfaceOverlay').classList.remove('show');
+        }
+
+        async function scanInterfaces() {
+            const scanning = document.getElementById('interfaceScanning');
+            const listContainer = document.getElementById('interfaceListContainer');
+            const statusMsg = document.getElementById('interfaceStatusMsg');
+            const scanTime = document.getElementById('interfaceScanTime');
+
+            scanning.style.display = 'block';
+            listContainer.style.display = 'none';
+            statusMsg.className = 'interface-status-msg';
+            statusMsg.style.display = 'none';
+
+            const startTime = Date.now();
+
+            try {
+                const response = await fetch('/api/scan_interfaces');
+                const data = await response.json();
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                scanTime.textContent = `Scan completed in ${elapsed}s`;
+
+                const interfaces = data.interfaces || [];
+
+                if (interfaces.length === 0) {
+                    listContainer.innerHTML = '<div style="text-align:center; color:var(--text-light); padding:20px; font-weight:600;">No network adapters found.</div>';
+                } else {
+                    interfaces.sort((a, b) => b.slave_count - a.slave_count);
+
+                    let html = '';
+                    interfaces.forEach(iface => {
+                        const hasSlaves = iface.slave_count > 0;
+                        let rowClasses = 'interface-row';
+                        if (hasSlaves) rowClasses += ' has-slaves';
+
+                        const escapedName = iface.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                        const onclick = hasSlaves ? `onclick="selectInterface('${escapedName}')"` : '';
+
+                        html += `<div class="${rowClasses}" ${onclick}>
+                            <div class="iface-info">
+                                <div class="iface-desc">${iface.desc}</div>
+                                <div class="iface-name">${iface.name}</div>
+                            </div>
+                            <div class="iface-badge">
+                                <span class="slave-count-badge ${hasSlaves ? 'has-slaves' : 'no-slaves'}">
+                                    ${hasSlaves ? iface.slave_count + ' slave' + (iface.slave_count > 1 ? 's' : '') : 'No slaves'}
+                                </span>
+                            </div>
+                        </div>`;
+                    });
+                    listContainer.innerHTML = html;
+                }
+
+                scanning.style.display = 'none';
+                listContainer.style.display = 'flex';
+
+            } catch (e) {
+                scanning.style.display = 'none';
+                listContainer.style.display = 'flex';
+                listContainer.innerHTML = `<div style="text-align:center; color:var(--red); padding:20px; font-weight:600;">Failed to scan: ${e.message}</div>`;
+            }
+        }
+
+        async function selectInterface(interfaceName) {
+            const statusMsg = document.getElementById('interfaceStatusMsg');
+
+            statusMsg.className = 'interface-status-msg saving';
+            statusMsg.textContent = 'Saving interface configuration...';
+
+            try {
+                const configResponse = await fetch('/api/config');
+                const config = await configResponse.json();
+
+                if (!config.config) config.config = {};
+                config.config.network_interface = interfaceName;
+
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+
+                statusMsg.textContent = 'Restarting motor process...';
+
+                const restartResponse = await fetch('/api/restart_motor', { method: 'POST' });
+                const restartResult = await restartResponse.json();
+
+                if (restartResult.success) {
+                    statusMsg.className = 'interface-status-msg success';
+                    statusMsg.textContent = `Connected! ${restartResult.message}`;
+                    disconnectedCounter = 0;
+                    setTimeout(() => hideInterfaceOverlay(), 1500);
+                } else {
+                    statusMsg.className = 'interface-status-msg error';
+                    statusMsg.textContent = `Connection failed: ${restartResult.message}`;
+                }
+
+            } catch (e) {
+                statusMsg.className = 'interface-status-msg error';
+                statusMsg.textContent = `Error: ${e.message}`;
+            }
+        }
+
+        // ========================================================
+        // Initialize
+        // ========================================================
+        restoreFromCache();  // Instant UI restore from localStorage before WS connects
+        connectWS();
+        fetchProduct();
+    </script>
+</body>
+</html>

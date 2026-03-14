@@ -1,0 +1,5 @@
+pysoem
+fastapi
+uvicorn[standard]
+websockets
+pyyaml

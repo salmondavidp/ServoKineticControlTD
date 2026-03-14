@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EtherCAT Motor Control - Servo Settings</title>
+    <style>
+        :root {
+            --bg-dark: #0d1117;
+            --bg-panel: #161b22;
+            --bg-card: #21262d;
+            --border-ui: #30363d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --text-gold: #d29922;
+            --accent-purple: #a371f7;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 12px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 10px 15px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-ui);
+            border-radius: 6px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header h1 {
+            color: var(--accent-blue);
+            font-size: 1.1rem;
+        }
+
+        .header .status {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 0.75rem;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.8rem;
+            padding: 6px 12px;
+            border: 1px solid var(--border-ui);
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .nav-link:hover {
+            color: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .nav-link.active {
+            color: var(--accent-blue);
+            border-color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.1);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 4px;
+        }
+
+        .status-dot.disconnected { background: var(--accent-red); }
+        .status-dot.connected { background: var(--text-gold); }
+        .status-dot.enabled { background: var(--accent-green); }
+
+        /* Tab Navigation */
+        .slave-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .slave-tab {
+            padding: 8px 16px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-ui);
+            border-radius: 6px 6px 0 0;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .slave-tab:hover {
+            color: var(--text-primary);
+            border-color: var(--text-secondary);
+        }
+
+        .slave-tab.active {
+            color: var(--accent-blue);
+            border-color: var(--accent-blue);
+            border-bottom-color: var(--bg-dark);
+            background: var(--bg-card);
+        }
+
+        /* Main Content */
+        .content {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 10px 15px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-ui);
+            border-radius: 6px;
+        }
+
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: #fff;
+        }
+
+        .btn-primary:hover { opacity: 0.85; }
+
+        .btn-primary:disabled {
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: not-allowed;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border-ui);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+        }
+
+        .btn-live {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-ui);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-live.active {
+            color: var(--accent-green);
+            border-color: var(--accent-green);
+            background: rgba(63, 185, 80, 0.1);
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--border-ui);
+            flex-shrink: 0;
+        }
+
+        .btn-live.active .live-dot {
+            background: var(--accent-green);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .interval-select {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border-ui);
+            border-radius: 4px;
+            padding: 5px 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        .interval-select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .status-text {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .status-text.loading { color: var(--text-gold); }
+        .status-text.error { color: var(--accent-red); }
+        .status-text.success { color: var(--accent-green); }
+
+        /* Settings Grid */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+            gap: 12px;
+        }
+
+        .settings-section {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-ui);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .section-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-blue);
+            border-bottom: 1px solid var(--border-ui);
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+        }
+
+        .section-title.green { color: var(--accent-green); }
+        .section-title.gold { color: var(--text-gold); }
+        .section-title.purple { color: var(--accent-purple); }
+        .section-title.red { color: var(--accent-red); }
+
+        .param-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .param-table tr {
+            border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+        }
+
+        .param-table tr:last-child {
+            border-bottom: none;
+        }
+
+        .param-table td {
+            padding: 6px 8px;
+            font-size: 0.8rem;
+        }
+
+        .param-table .param-label {
+            color: var(--text-secondary);
+            width: 50%;
+            white-space: nowrap;
+        }
+
+        .param-table .param-value {
+            color: var(--text-primary);
+            font-family: 'Consolas', 'Monaco', monospace;
+            text-align: right;
+        }
+
+        .param-table .param-value.highlight {
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        .param-table .param-value.green {
+            color: var(--accent-green);
+        }
+
+        .param-table .param-value.gold {
+            color: var(--text-gold);
+        }
+
+        .param-table .param-value.red {
+            color: var(--accent-red);
+        }
+
+        .param-table .param-sdo {
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            font-family: 'Consolas', 'Monaco', monospace;
+            opacity: 0.6;
+            width: 70px;
+        }
+
+        .param-unit {
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            margin-left: 4px;
+        }
+
+        /* No data state */
+        .no-data {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .no-data h2 {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+
+        .no-data p {
+            font-size: 0.85rem;
+            margin-bottom: 15px;
+        }
+
+        /* Status word bits */
+        .status-bits {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 4px;
+        }
+
+        .bit-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            padding: 3px 6px;
+            border-radius: 3px;
+            background: var(--bg-dark);
+        }
+
+        .bit-indicator {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .bit-indicator.on { background: var(--accent-green); }
+        .bit-indicator.off { background: var(--border-ui); }
+
+        .bit-label {
+            color: var(--text-secondary);
+        }
+
+        .bit-item.active .bit-label {
+            color: var(--accent-green);
+        }
+
+        /* Supported modes */
+        .mode-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .mode-badge {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: var(--bg-dark);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-ui);
+        }
+
+        .mode-badge.supported {
+            color: var(--accent-green);
+            border-color: var(--accent-green);
+            background: rgba(63, 185, 80, 0.1);
+        }
+
+        .mode-badge.current {
+            color: var(--accent-blue);
+            border-color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.15);
+        }
+
+        /* Spinner */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-ui);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .settings-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <h1>Servo Motor Settings</h1>
+            <div class="status">
+                <span>
+                    <span class="status-dot disconnected" id="statusDot"></span>
+                    <span id="statusText">Connecting...</span>
+                </span>
+                <span>
+                    <span class="status-dot disconnected" id="wsDot"></span>
+                    WebSocket
+                </span>
+            </div>
+        </div>
+        <div class="header-right">
+            <a href="/" class="nav-link">Simple UI</a>
+            <a href="/developer" class="nav-link">Developer</a>
+            <a href="/settings" class="nav-link active">Settings</a>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <button class="btn btn-primary" id="refreshBtn" onclick="readDriveParams()" disabled>Refresh</button>
+                <button class="btn btn-live" id="liveBtn" onclick="toggleLive()" disabled>
+                    <span class="live-dot"></span>
+                    <span id="liveBtnText">Live</span>
+                </button>
+                <select class="interval-select" id="intervalSelect" onchange="updateInterval()">
+                    <option value="1000">1s</option>
+                    <option value="2000" selected>2s</option>
+                    <option value="3000">3s</option>
+                    <option value="5000">5s</option>
+                    <option value="10000">10s</option>
+                </select>
+                <span class="status-text" id="readStatus">Waiting for connection...</span>
+            </div>
+            <div>
+                <span style="font-size: 0.75rem; color: var(--text-secondary);" id="lastUpdated"></span>
+            </div>
+        </div>
+
+        <div class="slave-tabs" id="slaveTabs"></div>
+
+        <div id="noData" class="no-data">
+            <h2>No Drive Data</h2>
+            <p>Connect to the servo drives and click "Refresh Parameters" to read all settings.</p>
+            <button class="btn btn-primary" id="refreshBtn2" onclick="readDriveParams()" disabled>Read Drive Parameters</button>
+        </div>
+
+        <div id="settingsContent" style="display: none;"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let wsConnected = false;
+        let driveData = [];
+        let activeSlaveIdx = 0;
+        let liveMode = false;
+        let liveTimer = null;
+        let liveInterval = 2000;
+        let pendingRequest = false;
+        let pendingRequestId = 0;
+        let requestCounter = 0;
+
+        // WebSocket connection
+        function connectWS() {
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${location.host}/ws?page=settings`);
+
+            ws.onopen = () => {
+                wsConnected = true;
+                document.getElementById('wsDot').className = 'status-dot connected';
+                document.getElementById('refreshBtn').disabled = false;
+                document.getElementById('refreshBtn2').disabled = false;
+                document.getElementById('liveBtn').disabled = false;
+                document.getElementById('readStatus').textContent = 'Connected. Click Live for auto-refresh.';
+                document.getElementById('readStatus').className = 'status-text';
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+
+                if (msg.type === 'status') {
+                    updateConnectionStatus(msg.data);
+                } else if (msg.type === 'response') {
+                    handleResponse(msg.data);
+                }
+            };
+
+            ws.onclose = () => {
+                wsConnected = false;
+                stopLive();
+                document.getElementById('wsDot').className = 'status-dot disconnected';
+                document.getElementById('refreshBtn').disabled = true;
+                document.getElementById('refreshBtn2').disabled = true;
+                document.getElementById('liveBtn').disabled = true;
+                document.getElementById('readStatus').textContent = 'Disconnected. Reconnecting...';
+                document.getElementById('readStatus').className = 'status-text error';
+                setTimeout(connectWS, 2000);
+            };
+
+            ws.onerror = () => {
+                ws.close();
+            };
+        }
+
+        function sendCmd(cmd, data) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ cmd, data }));
+            }
+        }
+
+        function updateConnectionStatus(data) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+
+            if (data.state === 0) {
+                dot.className = 'status-dot disconnected';
+                text.textContent = 'Disconnected';
+            } else if (data.state === 1) {
+                dot.className = 'status-dot connected';
+                text.textContent = `Connected (${data.num_slaves} slave${data.num_slaves !== 1 ? 's' : ''})`;
+            } else if (data.state >= 2) {
+                if (data.has_fault) {
+                    dot.className = 'status-dot disconnected';
+                    text.textContent = 'FAULT';
+                } else if (data.moving) {
+                    dot.className = 'status-dot enabled';
+                    text.textContent = 'Moving';
+                } else {
+                    dot.className = 'status-dot enabled';
+                    text.textContent = `Enabled (${data.num_slaves} slave${data.num_slaves !== 1 ? 's' : ''})`;
+                }
+            }
+        }
+
+        function readDriveParams() {
+            if (pendingRequest) return;
+            pendingRequest = true;
+            pendingRequestId = ++requestCounter;
+
+            if (!liveMode) {
+                document.getElementById('readStatus').innerHTML = '<span class="spinner"></span>Reading drive parameters...';
+                document.getElementById('readStatus').className = 'status-text loading';
+                document.getElementById('refreshBtn').disabled = true;
+            }
+            sendCmd('read_drive_params');
+
+            // Timeout fallback — reset pending and reschedule if live
+            const myId = pendingRequestId;
+            setTimeout(() => {
+                if (pendingRequest && pendingRequestId === myId) {
+                    pendingRequest = false;
+                    document.getElementById('refreshBtn').disabled = false;
+                    if (liveMode) {
+                        // Timed out but live mode is on — keep trying
+                        scheduleLiveRefresh();
+                    } else if (driveData.length === 0) {
+                        document.getElementById('readStatus').textContent = 'Timeout - no response received.';
+                        document.getElementById('readStatus').className = 'status-text error';
+                    }
+                }
+            }, 8000);
+        }
+
+        function handleResponse(resp) {
+            // Only handle responses that contain drive_params — ignore others
+            if (!resp.data || resp.data.drive_params === undefined) return;
+
+            pendingRequest = false;
+            driveData = resp.data.drive_params;
+            document.getElementById('refreshBtn').disabled = false;
+
+            if (driveData.length > 0) {
+                const timeStr = new Date().toLocaleTimeString();
+                if (liveMode) {
+                    document.getElementById('readStatus').innerHTML = '<span class="live-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent-green);animation:pulse 1.5s ease-in-out infinite;vertical-align:middle;margin-right:4px;"></span> Live — ' + driveData.length + ' drive(s)';
+                    document.getElementById('readStatus').className = 'status-text success';
+                } else {
+                    document.getElementById('readStatus').textContent = `Read ${driveData.length} drive(s) successfully.`;
+                    document.getElementById('readStatus').className = 'status-text success';
+                }
+                document.getElementById('lastUpdated').textContent = 'Updated: ' + timeStr;
+                renderTabs();
+                renderSettings(activeSlaveIdx);
+            } else {
+                document.getElementById('readStatus').textContent = resp.message || 'No drives found.';
+                document.getElementById('readStatus').className = 'status-text error';
+            }
+
+            // Schedule next live refresh
+            if (liveMode) {
+                scheduleLiveRefresh();
+            }
+        }
+
+        // ===== Live Mode =====
+        function toggleLive() {
+            if (liveMode) {
+                stopLive();
+            } else {
+                startLive();
+            }
+        }
+
+        function startLive() {
+            liveMode = true;
+            document.getElementById('liveBtn').classList.add('active');
+            document.getElementById('liveBtnText').textContent = 'Live';
+            readDriveParams();
+        }
+
+        function stopLive() {
+            liveMode = false;
+            if (liveTimer) {
+                clearTimeout(liveTimer);
+                liveTimer = null;
+            }
+            document.getElementById('liveBtn').classList.remove('active');
+            document.getElementById('liveBtnText').textContent = 'Live';
+            if (driveData.length > 0) {
+                document.getElementById('readStatus').textContent = `Live stopped. Last: ${driveData.length} drive(s).`;
+                document.getElementById('readStatus').className = 'status-text';
+            }
+        }
+
+        function scheduleLiveRefresh() {
+            if (liveTimer) clearTimeout(liveTimer);
+            liveTimer = setTimeout(() => {
+                if (liveMode && wsConnected) {
+                    readDriveParams();
+                }
+            }, liveInterval);
+        }
+
+        function updateInterval() {
+            liveInterval = parseInt(document.getElementById('intervalSelect').value);
+            if (liveMode) {
+                // Restart with new interval
+                if (liveTimer) clearTimeout(liveTimer);
+                scheduleLiveRefresh();
+            }
+        }
+
+        function renderTabs() {
+            const tabsEl = document.getElementById('slaveTabs');
+            tabsEl.innerHTML = '';
+
+            driveData.forEach((drive, idx) => {
+                const tab = document.createElement('div');
+                tab.className = 'slave-tab' + (idx === activeSlaveIdx ? ' active' : '');
+                tab.textContent = `Slave #${idx} - ${drive.device_name || 'Unknown'}`;
+                tab.onclick = () => {
+                    activeSlaveIdx = idx;
+                    renderTabs();
+                    renderSettings(idx);
+                };
+                tabsEl.appendChild(tab);
+            });
+        }
+
+        function fmtVal(val, fallback) {
+            if (val === null || val === undefined) return fallback || '--';
+            return val;
+        }
+
+        function fmtHex(val, digits) {
+            if (val === null || val === undefined) return '--';
+            digits = digits || 4;
+            return '0x' + val.toString(16).toUpperCase().padStart(digits, '0');
+        }
+
+        function getModeStr(mode) {
+            const modes = { 1: 'PP (Profile Position)', 3: 'PV (Profile Velocity)', 6: 'Homing', 7: 'IP (Interpolated Position)', 8: 'CSP (Cyclic Sync Position)', 9: 'CSV (Cyclic Sync Velocity)', 10: 'CST (Cyclic Sync Torque)' };
+            return modes[mode] || `Unknown (${mode})`;
+        }
+
+        function getStatusBits(sw) {
+            if (sw === null || sw === undefined) return [];
+            return [
+                { bit: 0,  name: 'Ready to Switch On',    active: !!(sw & 0x0001) },
+                { bit: 1,  name: 'Switched On',           active: !!(sw & 0x0002) },
+                { bit: 2,  name: 'Operation Enabled',     active: !!(sw & 0x0004) },
+                { bit: 3,  name: 'Fault',                 active: !!(sw & 0x0008) },
+                { bit: 4,  name: 'Voltage Enabled',       active: !!(sw & 0x0010) },
+                { bit: 5,  name: 'Quick Stop Active',     active: !(sw & 0x0020) },
+                { bit: 6,  name: 'Switch On Disabled',    active: !!(sw & 0x0040) },
+                { bit: 7,  name: 'Warning',               active: !!(sw & 0x0080) },
+                { bit: 10, name: 'Target Reached',        active: !!(sw & 0x0400) },
+                { bit: 11, name: 'Internal Limit Active', active: !!(sw & 0x0800) },
+                { bit: 12, name: 'Set-Point Ack',         active: !!(sw & 0x1000) },
+                { bit: 13, name: 'Following Error',       active: !!(sw & 0x2000) },
+            ];
+        }
+
+        function getSupportedModes(val) {
+            if (val === null || val === undefined) return [];
+            const allModes = [
+                { bit: 0,  mode: 1,  name: 'PP' },
+                { bit: 1,  mode: 2,  name: 'VL' },
+                { bit: 2,  mode: 3,  name: 'PV' },
+                { bit: 3,  mode: 4,  name: 'TQ' },
+                { bit: 5,  mode: 6,  name: 'Homing' },
+                { bit: 6,  mode: 7,  name: 'IP' },
+                { bit: 7,  mode: 8,  name: 'CSP' },
+                { bit: 8,  mode: 9,  name: 'CSV' },
+                { bit: 9,  mode: 10, name: 'CST' },
+            ];
+            return allModes.map(m => ({ ...m, supported: !!(val & (1 << m.bit)) }));
+        }
+
+        function renderSettings(idx) {
+            const drive = driveData[idx];
+            if (!drive) return;
+
+            document.getElementById('noData').style.display = 'none';
+            document.getElementById('settingsContent').style.display = 'block';
+
+            const currentMode = drive.modes_of_operation_display || drive.modes_of_operation;
+            const errorName = drive.error_code ? getErrorName(drive.error_code) : null;
+
+            let html = '<div class="settings-grid">';
+
+            // ========== Device Identity ==========
+            html += `
+            <div class="settings-section">
+                <div class="section-title">Device Identity</div>
+                <table class="param-table">
+                    <tr><td class="param-label">Device Name</td><td class="param-value highlight">${fmtVal(drive.device_name)}</td><td class="param-sdo">0x1008</td></tr>
+                    <tr><td class="param-label">Hardware Version</td><td class="param-value">${fmtVal(drive.hw_version)}</td><td class="param-sdo">0x1009</td></tr>
+                    <tr><td class="param-label">Software Version</td><td class="param-value">${fmtVal(drive.sw_version)}</td><td class="param-sdo">0x100A</td></tr>
+                    <tr><td class="param-label">Vendor ID</td><td class="param-value">${fmtHex(drive.vendor_id, 8)}</td><td class="param-sdo">0x1018:01</td></tr>
+                    <tr><td class="param-label">Product Code</td><td class="param-value">${fmtHex(drive.product_code, 8)}</td><td class="param-sdo">0x1018:02</td></tr>
+                    <tr><td class="param-label">Revision Number</td><td class="param-value">${fmtHex(drive.revision, 8)}</td><td class="param-sdo">0x1018:03</td></tr>
+                    <tr><td class="param-label">Serial Number</td><td class="param-value">${fmtVal(drive.serial_number)}</td><td class="param-sdo">0x1018:04</td></tr>
+                </table>
+            </div>`;
+
+            // ========== Rated Values / Motor ==========
+            html += `
+            <div class="settings-section">
+                <div class="section-title gold">Motor / Rated Values</div>
+                <table class="param-table">
+                    <tr><td class="param-label">Motor Code (Pr0.01)</td><td class="param-value">${fmtVal(drive.pr0_01_motor_code)}</td><td class="param-sdo">0x2001</td></tr>
+                    <tr><td class="param-label">Rated Current (Pr0.02)</td><td class="param-value gold">${fmtVal(drive.pr0_02_rated_current)}<span class="param-unit">mA</span></td><td class="param-sdo">0x2002</td></tr>
+                    <tr><td class="param-label">Rated Speed (Pr0.03)</td><td class="param-value gold">${fmtVal(drive.pr0_03_rated_speed)}<span class="param-unit">rpm</span></td><td class="param-sdo">0x2003</td></tr>
+                    <tr><td class="param-label">Rated Torque (Pr0.05)</td><td class="param-value gold">${fmtVal(drive.pr0_05_rated_torque)}<span class="param-unit">mNm</span></td><td class="param-sdo">0x2005</td></tr>
+                    <tr><td class="param-label">Max Torque Limit (Pr0.06)</td><td class="param-value">${fmtVal(drive.pr0_06_max_torque)}<span class="param-unit">%</span></td><td class="param-sdo">0x2006</td></tr>
+                    <tr><td class="param-label">Motor Rated Current (CiA)</td><td class="param-value">${fmtVal(drive.motor_rated_current)}<span class="param-unit">mA</span></td><td class="param-sdo">0x6075</td></tr>
+                    <tr><td class="param-label">Motor Rated Torque (CiA)</td><td class="param-value">${fmtVal(drive.motor_rated_torque)}<span class="param-unit">mNm</span></td><td class="param-sdo">0x6076</td></tr>
+                    <tr><td class="param-label">Max Current</td><td class="param-value">${fmtVal(drive.max_current)}<span class="param-unit">0.1%</span></td><td class="param-sdo">0x6073</td></tr>
+                    <tr><td class="param-label">Torque Actual</td><td class="param-value">${fmtVal(drive.torque_actual)}<span class="param-unit">0.1%</span></td><td class="param-sdo">0x6077</td></tr>
+                </table>
+            </div>`;
+
+            // ========== Operation Mode ==========
+            const modes = getSupportedModes(drive.supported_drive_modes);
+            let modesHtml = '<div class="mode-badges">';
+            modes.forEach(m => {
+                const isCurrent = m.mode === currentMode;
+                let cls = '';
+                if (isCurrent) cls = 'current';
+                else if (m.supported) cls = 'supported';
+                modesHtml += `<span class="mode-badge ${cls}">${m.name}</span>`;
+            });
+            modesHtml += '</div>';
+
+            html += `
+            <div class="settings-section">
+                <div class="section-title green">Operation Mode</div>
+                <table class="param-table">
+                    <tr><td class="param-label">Current Mode</td><td class="param-value highlight">${getModeStr(currentMode)}</td><td class="param-sdo">0x6061</td></tr>
+                    <tr><td class="param-label">Modes of Operation</td><td class="param-value">${fmtVal(drive.modes_of_operation)}</td><td class="param-sdo">0x6060</td></tr>
+                    <tr><td class="param-label">Polarity</td><td class="param-value">${drive.polarity !== null && drive.polarity !== undefined ? fmtHex(drive.polarity, 2) : '--'}</td><td class="param-sdo">0x607E</td></tr>
+                </table>
+                <div style="margin-top: 10px;">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 6px;">Supported Drive Modes (0x6502):</div>
+                    ${modesHtml}
+                </div>
+            </div>`;
+
+            // ========== Motion Profile ==========
+            html += `
+            <div class="settings-section">
+                <div class="section-title purple">Motion Profile / Speed</div>
+                <table class="param-table">
+                    <tr><td class="param-label">Profile Velocity</td><td class="param-value highlight">${fmtVal(drive.profile_velocity)}<span class="param-unit">units/s</span></td><td class="param-sdo">0x6081</td></tr>
+                    <tr><td class="param-label">Max Profile Velocity</td><td class="param-value">${fmtVal(drive.max_profile_velocity)}<span class="param-unit">units/s</span></td><td class="param-sdo">0x607F</td></tr>
+                    <tr><td class="param-label">Max Motor Speed</td><td class="param-value">${fmtVal(drive.max_motor_speed)}<span class="param-unit">rpm</span></td><td class="param-sdo">0x6080</td></tr>
+                    <tr><td class="param-label">Profile Acceleration</td><td class="param-value">${fmtVal(drive.profile_acceleration)}<span class="param-unit">units/s&sup2;</span></td><td class="param-sdo">0x6083</td></tr>
+                    <tr><td class="param-label">Profile Deceleration</td><td class="param-value">${fmtVal(drive.profile_deceleration)}<span class="param-unit">units/s&sup2;</span></td><td class="param-sdo">0x6084</td></tr>
+                    <tr><td class="param-label">Quick Stop Deceleration</td><td class="param-value">${fmtVal(drive.quick_stop_deceleration)}<span class="param-unit">units/s&sup2;</span></td><td class="param-sdo">0x6085</td></tr>
+                    <tr><td class="param-label">End Velocity</td><td class="param-value">${fmtVal(drive.end_velocity)}<span class="param-unit">units/s</span></td><td class="param-sdo">0x6082</td></tr>
+                    <tr><td class="param-label">Motion Profile Type</td><td class="param-value">${drive.motion_profile_type === 0 ? 'Trapezoidal' : drive.motion_profile_type === 1 ? 'S-Curve' : fmtVal(drive.motion_profile_type)}</td><td class="param-sdo">0x6086</td></tr>
+                    <tr><td class="param-label">Target Velocity (PV)</td><td class="param-value">${fmtVal(drive.target_velocity)}<span class="param-unit">units/s</span></td><td class="param-sdo">0x60FF</td></tr>
+                    <tr><td class="param-label">Interp. Time Period (CSP)</td><td class="param-value">${fmtVal(drive.interpolation_time_period)}<span class="param-unit">ms</span></td><td class="param-sdo">0x60C2</td></tr>
+                    <tr><td class="param-label">CSP Velocity (Software)</td><td class="param-value green">${fmtVal(drive.csp_velocity)}<span class="param-unit">units/ms</span></td><td class="param-sdo">--</td></tr>
+                </table>
+            </div>`;
+
+            // ========== Position / Encoder ==========
+            const posMeters = drive.position_actual !== null && drive.position_actual !== undefined
+                ? (drive.position_actual * (drive.scale_factor || 1) / (drive.actual_steps_per_meter || 1)).toFixed(4)
+                : '--';
+
+            html += `
+            <div class="settings-section">
+                <div class="section-title">Position / Encoder</div>
+                <table class="param-table">
+                    <tr><td class="param-label">Position Actual (raw)</td><td class="param-value">${fmtVal(drive.position_actual)}<span class="param-unit">counts</span></td><td class="param-sdo">0x6064</td></tr>
+                    <tr><td class="param-label">Position Actual</td><td class="param-value highlight">${posMeters}<span class="param-unit">m</span></td><td class="param-sdo">--</td></tr>
+                    <tr><td class="param-label">Velocity Actual</td><td class="param-value">${fmtVal(drive.velocity_actual)}<span class="param-unit">counts/s</span></td><td class="param-sdo">0x606C</td></tr>
+                    <tr><td class="param-label">Target Position</td><td class="param-value">${fmtVal(drive.target_position)}<span class="param-unit">counts</span></td><td class="param-sdo">0x607A</td></tr>
+                    <tr><td class="param-label">Home Offset</td><td class="param-value">${fmtVal(drive.home_offset)}<span class="param-unit">counts</span></td><td class="param-sdo">0x607C</td></tr>
+                    <tr><td class="param-label">Encoder Lines (Pr0.04)</td><td class="param-value gold">${fmtVal(drive.pr0_04_encoder_lines)}</td><td class="param-sdo">0x2004</td></tr>
+                    <tr><td class="param-label">Encoder Increments (CiA)</td><td class="param-value">${fmtVal(drive.encoder_increments)}</td><td class="param-sdo">0x608F:01</td></tr>
+                    <tr><td class="param-label">Encoder Motor Revolutions</td><td class="param-value">${fmtVal(drive.encoder_motor_revolutions)}</td><td class="param-sdo">0x608F:02</td></tr>
+                    <tr><td class="param-label">Encoder Mode (Pr0.15)</td><td class="param-value">${fmtVal(drive.pr0_15_encoder_mode)}</td><td class="param-sdo">0x2015</td></tr>
+                </table>
+            </div>`;
+
+            // ========== Position Limits / Following Error ==========
+            html += `
+            <div class="settings-section">
+                <div class="section-title">Position Limits & Following Error</div>
+                <table class="param-table">
+                    <tr><td class="param-label">SW Position Limit Min</td><td class="param-value">${fmtVal(drive.sw_position_limit_min)}<span class="param-unit">counts</span></td><td class="param-sdo">0x607D:01</td></tr>
+                    <tr><td class="param-label">SW Position Limit Max</td><td class="param-value">${fmtVal(drive.sw_position_limit_max)}<span class="param-unit">counts</span></td><td class="param-sdo">0x607D:02</td></tr>
+                    <tr><td class="param-label">Following Error Window</td><td class="param-value">${fmtVal(drive.following_error_window)}<span class="param-unit">counts</span></td><td class="param-sdo">0x6065</td></tr>
+                    <tr><td class="param-label">Position Window</td><td class="param-value">${fmtVal(drive.position_window)}<span class="param-unit">counts</span></td><td class="param-sdo">0x6067</td></tr>
+                </table>
+            </div>`;
+
+            // ========== Interface / Config ==========
+            html += `
+            <div class="settings-section">
+                <div class="section-title green">Interface / Configuration</div>
+                <table class="param-table">
+                    <tr><td class="param-label">Actual Steps / Meter</td><td class="param-value highlight">${fmtVal(drive.actual_steps_per_meter)}</td><td class="param-sdo">config</td></tr>
+                    <tr><td class="param-label">Raw Steps / Meter</td><td class="param-value">${fmtVal(drive.raw_steps_per_meter)}</td><td class="param-sdo">config</td></tr>
+                    <tr><td class="param-label">Scale Factor</td><td class="param-value">${drive.scale_factor !== null ? drive.scale_factor?.toFixed(8) : '--'}</td><td class="param-sdo">config</td></tr>
+                    <tr><td class="param-label">Comm Timeout (Pr0.20)</td><td class="param-value">${fmtVal(drive.pr0_20_comm_timeout)}</td><td class="param-sdo">0x2020</td></tr>
+                </table>
+            </div>`;
+
+            // ========== Status Word & Control Word ==========
+            const statusBits = getStatusBits(drive.statusword);
+            let bitsHtml = '<div class="status-bits">';
+            statusBits.forEach(b => {
+                bitsHtml += `<div class="bit-item ${b.active ? 'active' : ''}">
+                    <span class="bit-indicator ${b.active ? 'on' : 'off'}"></span>
+                    <span class="bit-label">Bit ${b.bit}: ${b.name}</span>
+                </div>`;
+            });
+            bitsHtml += '</div>';
+
+            html += `
+            <div class="settings-section">
+                <div class="section-title ${drive.error_code ? 'red' : ''}">Status & Error</div>
+                <table class="param-table">
+                    <tr><td class="param-label">Statusword</td><td class="param-value">${fmtHex(drive.statusword)}</td><td class="param-sdo">0x6041</td></tr>
+                    <tr><td class="param-label">Controlword</td><td class="param-value">${fmtHex(drive.controlword)}</td><td class="param-sdo">0x6040</td></tr>
+                    <tr><td class="param-label">Error Code</td><td class="param-value ${drive.error_code ? 'red' : ''}">${drive.error_code ? fmtHex(drive.error_code) + (errorName ? ' (' + errorName + ')' : '') : 'None'}</td><td class="param-sdo">0x603F</td></tr>
+                </table>
+                <div style="margin-top: 10px;">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 6px;">Statusword Bits:</div>
+                    ${bitsHtml}
+                </div>
+            </div>`;
+
+            html += '</div>';
+
+            document.getElementById('settingsContent').innerHTML = html;
+        }
+
+        // Error code lookup (subset of known codes)
+        function getErrorName(code) {
+            const errors = {
+                0x3150: 'Er0A0 - Phase A current error',
+                0x3151: 'Er0A1 - Phase B current error',
+                0x3153: 'Er0A3 - Motor cable disconnected',
+                0x3211: 'Er0C0 - DC bus overvoltage',
+                0x3221: 'Er0d0 - DC bus undervoltage',
+                0x2211: 'Er0E0 - Overcurrent',
+                0x2212: 'Er0E1 - IPM overcurrent',
+                0x4210: 'Er0f0 - Driver overheated',
+                0x8311: 'Er100 - Motor overloaded',
+                0x8310: 'Er101 - Driver overloaded',
+                0x8301: 'Er102 - Motor blocked',
+                0x7321: 'Er150 - Encoder disconnected',
+                0x7322: 'Er151 - Encoder comm error',
+                0x7325: 'Er153 - Multiturn encoder error',
+                0x8611: 'Er180 - Position deviation',
+                0x8402: 'Er1A0 - Overspeed',
+                0x8612: 'Er1b0 - Bus signal dithering',
+                0x821B: 'Er81b - SM2 watchdog timeout',
+                0xFF02: 'Er81A - Sync error',
+            };
+            return errors[code] || null;
+        }
+
+        // Initialize
+        connectWS();
+    </script>
+</body>
+</html>

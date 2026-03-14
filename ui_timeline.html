@@ -1,0 +1,2770 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#1a1a2e; color:#e0e0e0; font-family:Segoe UI,Arial,sans-serif; font-size:12px; display:flex; height:100vh; }
+
+/* Sidebar */
+#sidebar { width:280px; background:#16213e; display:flex; flex-direction:column; border-right:1px solid #333; overflow:hidden; }
+#sidebar-scroll { flex:1; overflow-y:auto; padding:10px; }
+#sidebar-scroll::-webkit-scrollbar { width:8px; }
+#sidebar-scroll::-webkit-scrollbar-track { background:#0a0a1a; }
+#sidebar-scroll::-webkit-scrollbar-thumb { background:#444; border-radius:4px; }
+
+/* Main area */
+#main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+/* Controls bar */
+#controls { height:40px; background:#0f3460; display:flex; align-items:center; padding:0 10px; gap:8px; flex-shrink:0; }
+#controls button { background:#e94560; border:none; color:#fff; padding:5px 14px; border-radius:3px; cursor:pointer; font-size:12px; }
+#controls button:hover { background:#ff6b81; }
+#controls button.active { background:#4ecca3; }
+#time-display { color:#4ecca3; font-size:14px; font-weight:bold; margin-left:auto; }
+
+/* Tab bar */
+#tabs { height:32px; background:#0a0a1a; display:flex; align-items:stretch; border-bottom:1px solid #333; flex-shrink:0; }
+.tab { padding:0 20px; display:flex; align-items:center; cursor:pointer; color:#888; font-size:12px; border-right:1px solid #222; }
+.tab:hover { color:#e0e0e0; background:#16213e; }
+.tab.active { color:#4ecca3; background:#16213e; border-bottom:2px solid #4ecca3; }
+
+/* Timeline area */
+#timeline-area { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+#ruler { height:25px; background:#0a0a1a; position:relative; overflow:hidden; cursor:pointer; flex-shrink:0; }
+#ruler canvas { height:100%; }
+#tracks { flex:1; position:relative; overflow:auto; background:#12121f; }
+#tracks::-webkit-scrollbar { width:10px; height:10px; }
+#tracks::-webkit-scrollbar-track { background:#0a0a1a; }
+#tracks::-webkit-scrollbar-thumb { background:#444; border-radius:5px; }
+#tracks::-webkit-scrollbar-corner { background:#0a0a1a; }
+.track { height:40px; border-bottom:1px solid #222; position:relative; display:flex; }
+.track-label { width:60px; background:#16213e; display:flex; align-items:center; justify-content:center; font-size:11px; color:#888; flex-shrink:0; }
+.track-lane { position:relative; }
+.pattern-block { position:absolute; height:30px; top:5px; border-radius:4px; cursor:grab; display:flex; align-items:center; justify-content:center; font-size:10px; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.5); min-width:20px; }
+.pattern-block:active { cursor:grabbing; }
+#playhead { position:absolute; top:0; left:60px; width:2px; background:#e94560; height:100%; z-index:10; pointer-events:none; will-change:transform; }
+
+/* Cue timeline */
+#cue-tracks { flex:1; position:relative; overflow:auto; background:#12121f; }
+#cue-tracks::-webkit-scrollbar { width:10px; height:10px; }
+#cue-tracks::-webkit-scrollbar-track { background:#0a0a1a; }
+#cue-tracks::-webkit-scrollbar-thumb { background:#444; border-radius:5px; }
+#cue-tracks::-webkit-scrollbar-corner { background:#0a0a1a; }
+.cue-track { height:50px; border-bottom:1px solid #222; position:relative; display:flex; }
+.cue-track-label { width:60px; background:#16213e; display:flex; align-items:center; justify-content:center; font-size:11px; color:#888; flex-shrink:0; }
+.cue-track-lane { position:relative; }
+.cue-block { position:absolute; height:40px; top:5px; border-radius:5px; cursor:grab; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.7); min-width:30px; border:2px solid rgba(255,255,255,0.3); }
+.cue-block:active { cursor:grabbing; }
+.cue-block .cue-del { position:absolute; top:50%; right:4px; transform:translateY(-50%); width:20px; height:20px; line-height:20px; text-align:center; font-size:13px; font-weight:bold; cursor:pointer; opacity:0.7; background:rgba(0,0,0,0.4); border-radius:3px; color:#ff6b6b; z-index:5; }
+.cue-block .cue-del:hover { opacity:1; background:rgba(255,0,0,0.5); color:#fff; }
+#cue-playhead { position:absolute; top:0; left:60px; width:2px; background:#e94560; height:100%; z-index:10; pointer-events:none; will-change:transform; }
+
+/* Sidebar styling */
+h3 { color:#4ecca3; margin:8px 0 5px; font-size:13px; }
+.section-title { color:#e94560; font-size:11px; text-transform:uppercase; letter-spacing:1px; margin:12px 0 4px; }
+.prop-row { display:flex; align-items:center; margin:3px 0; }
+.prop-row label { width:110px; color:#888; font-size:11px; }
+.prop-row input, .prop-row select { flex:1; background:#0a0a1a; border:1px solid #333; color:#e0e0e0; padding:3px 6px; border-radius:3px; font-size:11px; }
+.prop-row input:focus, .prop-row select:focus { border-color:#4ecca3; outline:none; }
+
+/* Lists */
+.list-item { padding:6px 8px; margin:2px 0; border-radius:3px; cursor:grab; display:flex; justify-content:space-between; align-items:center; }
+.list-item:hover { background:#1a2a4a; }
+.list-item.selected { background:#0f3460; border:1px solid #4ecca3; }
+.list-item .del-btn { background:none; border:none; color:#e94560; cursor:pointer; font-size:14px; }
+.btn-add { width:100%; background:#4ecca3; border:none; color:#1a1a2e; padding:6px; border-radius:3px; cursor:pointer; font-weight:bold; margin:5px 0; font-size:12px; }
+.btn-add:hover { background:#6ee7b7; }
+.btn-secondary { width:100%; background:#0f3460; border:1px solid #4ecca3; color:#4ecca3; padding:5px; border-radius:3px; cursor:pointer; margin:3px 0; font-size:11px; }
+.btn-secondary:hover { background:#1a4a7a; }
+.btn-danger { background:#e94560; border:none; color:#fff; padding:5px 10px; border-radius:3px; cursor:pointer; font-size:11px; }
+.ch-toggle { width:32px; height:22px; border:1px solid #333; border-radius:3px; cursor:pointer; font-size:9px; text-align:center; line-height:20px; color:#888; background:#0a0a1a; }
+.ch-toggle.active { background:#4ecca3; color:#1a1a2e; border-color:#4ecca3; font-weight:bold; }
+.ch-toggle:hover { border-color:#4ecca3; }
+.ch-ctrl-btn { background:none; border:1px solid #444; color:#888; padding:1px 6px; border-radius:2px; cursor:pointer; font-size:9px; }
+.ch-ctrl-btn:hover { border-color:#4ecca3; color:#4ecca3; }
+.btn-danger:hover { background:#ff6b81; }
+
+/* Hide/show views */
+.view { display:none; flex-direction:column; flex:1; overflow:hidden; }
+.view.active { display:flex; }
+
+/* Mapping grid */
+#map-grid { display:grid; gap:3px; padding:10px; flex:1; overflow:auto; align-content:start; }
+.map-cell { background:#1a2a4a; border:1px solid #333; border-radius:4px; min-height:50px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; font-size:11px; color:#888; transition:background 0.15s; position:relative; }
+.map-cell:hover { border-color:#4ecca3; background:#1a3a5a; }
+.map-cell.assigned { background:#0f3460; border-color:#4ecca3; color:#4ecca3; }
+.map-cell .cell-ch { font-size:16px; font-weight:bold; color:#4ecca3; }
+.map-cell .cell-pos { font-size:9px; color:#666; position:absolute; top:2px; left:4px; }
+.map-cell .cell-remove { position:absolute; top:2px; right:4px; width:16px; height:16px; line-height:16px; text-align:center; font-size:11px; cursor:pointer; opacity:0; color:#e94560; background:rgba(0,0,0,0.4); border-radius:2px; }
+.map-cell:hover .cell-remove { opacity:0.7; }
+.map-cell .cell-remove:hover { opacity:1; background:rgba(255,0,0,0.4); color:#fff; }
+.map-popup { position:fixed; background:#16213e; border:1px solid #4ecca3; border-radius:5px; padding:8px; z-index:100; box-shadow:0 4px 12px rgba(0,0,0,0.5); }
+.map-popup input { width:70px; background:#0a0a1a; border:1px solid #333; color:#e0e0e0; padding:4px 6px; border-radius:3px; font-size:12px; }
+.map-popup button { background:#4ecca3; border:none; color:#1a1a2e; padding:4px 10px; border-radius:3px; cursor:pointer; font-size:11px; font-weight:bold; margin-left:4px; }
+.map-popup button:hover { background:#6ee7b7; }
+.map-cell.active-now { box-shadow:0 0 8px #4ecca3, inset 0 0 10px rgba(78,204,163,0.2); border-color:#4ecca3; }
+
+/* Pattern assign grid */
+.pat-cell { border:1px solid #333; border-radius:3px; min-height:44px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; font-size:10px; color:#666; transition:all 0.15s; }
+.pat-cell:hover { border-color:#4ecca3; }
+.pat-cell.pat-active { background:#0f3460; border-color:#4ecca3; color:#4ecca3; }
+.pat-cell .pat-ch { font-size:13px; font-weight:bold; }
+.pat-cell .pat-pos { font-size:8px; color:#555; }
+
+/* Output grid */
+.out-cell { border:1px solid #222; border-radius:3px; min-height:44px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:10px; }
+.out-cell .out-val { font-size:12px; font-weight:bold; }
+
+/* EtherCAT panel */
+#ec-panel { padding:10px; }
+.ec-section { margin-bottom:10px; }
+.ec-section-title { color:#f1c40f; font-size:11px; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+.ec-btn { background:#f1c40f; border:none; color:#1a1a2e; padding:5px 12px; border-radius:3px; cursor:pointer; font-size:11px; font-weight:bold; margin:2px; }
+.ec-btn:hover { background:#f9e547; }
+.ec-btn.ec-danger { background:#e94560; color:#fff; }
+.ec-btn.ec-danger:hover { background:#ff6b81; }
+.ec-btn.ec-success { background:#4ecca3; color:#1a1a2e; }
+.ec-btn.ec-success:hover { background:#6ee7b7; }
+.ec-btn:disabled { opacity:0.4; cursor:not-allowed; }
+.ec-slave-row { display:flex; align-items:center; gap:8px; padding:4px 6px; margin:2px 0; background:#0a0a1a; border-radius:3px; font-size:11px; }
+.ec-slave-row .ec-dot { width:8px; height:8px; border-radius:50%; }
+.ec-slave-row .ec-dot.ok { background:#4ecca3; }
+.ec-slave-row .ec-dot.fault { background:#e94560; }
+.ec-slave-row .ec-dot.off { background:#555; }
+.ec-move-row { display:flex; align-items:center; gap:6px; margin:2px 0; }
+.ec-move-row input { width:80px; background:#0a0a1a; border:1px solid #333; color:#e0e0e0; padding:3px 6px; border-radius:3px; font-size:11px; }
+.ec-move-row label { color:#888; font-size:11px; min-width:60px; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div id="sidebar-scroll">
+    <h3>DNA Controller</h3>
+
+    <div class="section-title">Project</div>
+    <div style="display:flex;gap:4px;margin:4px 0;">
+      <button class="btn-secondary" id="btn-save-project" style="flex:1;">Save</button>
+      <button class="btn-secondary" id="btn-new-project" style="flex:1;border-color:#e94560;color:#e94560;">New</button>
+    </div>
+    <select id="project-list" style="width:100%;background:#0a0a1a;border:1px solid #333;color:#e0e0e0;padding:4px 6px;border-radius:3px;font-size:11px;margin:4px 0;">
+      <option value="">-- Select Project --</option>
+    </select>
+    <div style="display:flex;gap:4px;margin:2px 0;">
+      <button class="btn-secondary" id="btn-load-project" style="flex:1;">Load Selected</button>
+      <button class="btn-secondary" id="btn-delete-project" style="flex:1;border-color:#e94560;color:#e94560;">Delete</button>
+    </div>
+
+    <div class="section-title">Timeline</div>
+    <div class="prop-row"><label>Duration</label><span style="display:flex;gap:4px;align-items:center;"><input id="durMin" type="number" value="1" step="1" min="0" style="width:45px;">m<input id="durSec" type="number" value="0" step="1" min="0" max="59" style="width:45px;">s</span></div>
+    <input id="totalDur" type="hidden" value="60">
+
+    <div id="dmx-sidebar-section">
+    <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Channels</span>
+      <span>
+        <button class="ch-ctrl-btn" id="btn-all-on" title="Enable All">All</button>
+        <button class="ch-ctrl-btn" id="btn-all-off" title="Disable All">None</button>
+      </span>
+    </div>
+    <div class="prop-row"><label>First Channel</label><input id="firstChan" type="number" value="0" step="1" min="0"></div>
+    <div class="prop-row"><label>Total Channels</label><input id="totalChans" type="number" value="50" step="1" min="1"></div>
+    <div id="chan-toggles" style="display:flex;flex-wrap:wrap;gap:2px;margin:6px 0;max-height:120px;overflow-y:auto;"></div>
+
+    <div class="section-title">Output</div>
+    <div class="prop-row"><label>Max Degrees</label><input id="maxDeg" type="number" value="180" step="1" min="0" max="360"></div>
+    <div class="prop-row"><label>Lag (s)</label><input id="lagTime" type="number" value="0.8" step="0.1" min="0"></div>
+    </div>
+
+    <!-- CUE MANAGER SIDEBAR -->
+    <div id="sidebar-cues">
+      <div class="section-title">Cues</div>
+      <div id="cue-list"></div>
+      <button class="btn-add" id="btn-new-cue">+ New Cue</button>
+      <div id="cue-props" style="display:none">
+        <div class="section-title">Selected Cue</div>
+        <div class="prop-row"><label>Name</label><input id="cue-name" type="text"></div>
+        <button class="btn-secondary" id="btn-edit-cue">Edit Patterns</button>
+        <div style="color:#666;font-size:10px;margin:4px 0;">Drag cue to timeline to place it</div>
+      </div>
+    </div>
+
+    <!-- PATTERN EDITOR SIDEBAR (shown when editing a cue) -->
+    <div id="sidebar-patterns" style="display:none">
+      <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Patterns</span>
+        <button class="btn-danger" id="btn-back-cues" style="font-size:10px;padding:3px 8px;">Back</button>
+      </div>
+      <div id="pattern-list"></div>
+      <div style="display:flex;gap:4px;margin:5px 0;">
+        <select id="add-pattern-type" style="flex:1;background:#0a0a1a;border:1px solid #4ecca3;color:#4ecca3;padding:6px;border-radius:3px;font-size:12px;font-weight:bold;">
+          <option value="dmx">DMX</option>
+          <option value="servo">Servo</option>
+        </select>
+        <button class="btn-add" id="add-pattern" style="flex:2;">+ Add Pattern</button>
+      </div>
+      <div id="props-panel" style="display:none">
+        <div class="section-title">Selected Pattern</div>
+        <div id="pat-type-badge" style="display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:bold;margin-bottom:4px;"></div>
+        <!-- DMX pattern properties -->
+        <div id="dmx-props">
+          <div class="prop-row"><label>Start (s)</label><input id="p-start" type="number" step="0.1" min="0"></div>
+          <div class="prop-row"><label>Ramp Up (s)</label><input id="p-rampup" type="number" step="0.1" min="0"></div>
+          <div class="prop-row"><label>Hold High (s)</label><input id="p-holdhigh" type="number" step="0.1" min="0"></div>
+          <div class="prop-row"><label>Ramp Down (s)</label><input id="p-rampdown" type="number" step="0.1" min="0"></div>
+          <div class="prop-row"><label>Hold Low (s)</label><input id="p-holdlow" type="number" step="0.1" min="0"></div>
+          <div class="prop-row"><label>Start Chan</label><input id="p-startchan" type="number" step="1" min="0"></div>
+          <div class="prop-row"><label>Num Chans</label><input id="p-numchans" type="number" step="1" min="1"></div>
+          <div class="prop-row"><label>Delay (ms)</label><input id="p-delay" type="number" step="1" min="0"></div>
+        </div>
+        <!-- Servo pattern properties -->
+        <div id="servo-props" style="display:none;">
+          <div class="prop-row"><label>Start (s)</label><input id="sp-start" type="number" step="0.1" min="0"></div>
+          <div class="prop-row"><label>Duration (s)</label><input id="sp-duration" type="number" step="1" min="1" value="10" readonly style="opacity:0.6;" title="Auto-calculated from steps"></div>
+
+          <!-- EtherCAT Connection (moved to sidebar) -->
+          <div class="section-title" style="margin-top:8px;">EtherCAT Connection</div>
+          <div style="margin:4px 0;">
+            <select id="ec-adapter" style="width:100%;background:#0a0a1a;border:1px solid #333;color:#e0e0e0;padding:3px 5px;border-radius:3px;font-size:10px;margin-bottom:4px;">
+              <option value="">-- Select Adapter --</option>
+            </select>
+            <div style="display:flex;gap:3px;">
+              <button class="ec-btn ec-success" id="ec-btn-scan" style="flex:1;font-size:9px;padding:2px 4px;">Scan</button>
+              <button class="ec-btn ec-success" id="ec-btn-connect" style="flex:1;font-size:9px;padding:2px 4px;">Connect</button>
+              <button class="ec-btn ec-danger" id="ec-btn-disconnect" style="flex:1;font-size:9px;padding:2px 4px;">Disconnect</button>
+            </div>
+          </div>
+          <div id="ec-conn-status" style="color:#888;font-size:10px;margin:4px 0;">Not connected</div>
+
+          <!-- Hidden config fields used by connect logic -->
+          <div style="display:none;">
+            <select id="ec-mode"><option value="CSP">CSP</option><option value="PP">PP</option><option value="PV">PV</option></select>
+            <input id="ec-velocity" type="number" value="80000">
+            <input id="ec-accel" type="number" value="6000">
+            <input id="ec-decel" type="number" value="6000">
+            <input id="ec-csp-vel" type="number" value="100">
+            <input id="ec-steps" type="number" value="792914">
+            <input id="ec-raw-steps" type="number" value="202985985">
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div id="sidebar-placed" style="display:none"><div id="placed-list"></div></div>
+
+    <!-- MAPPING SIDEBAR -->
+    <div id="sidebar-mapping" style="display:none">
+      <div class="section-title">Grid Size</div>
+      <div class="prop-row"><label>Columns (X)</label><input id="map-cols" type="number" value="6" step="1" min="1" max="50" style="width:50px;"></div>
+      <div class="prop-row"><label>Rows (Y)</label><input id="map-rows" type="number" value="4" step="1" min="1" max="50" style="width:50px;"></div>
+      <div style="color:#666;font-size:10px;margin:6px 0;">Click a cell to assign a channel. Click the x to remove.</div>
+      <div class="section-title">Auto Fill</div>
+      <div class="prop-row"><label>Start Chan</label><input id="map-auto-start" type="number" value="0" step="1" min="0" style="width:50px;"></div>
+      <button class="btn-secondary" id="btn-map-autofill">Auto Fill (L→R, T→B)</button>
+      <button class="btn-secondary" id="btn-map-clear">Clear All</button>
+    </div>
+  </div>
+</div>
+
+<div id="main">
+  <div id="controls">
+    <button id="btn-run">Run</button>
+    <button id="btn-pause">Pause</button>
+    <button id="btn-reset">Reset</button>
+    <button id="btn-loop" class="active">Loop</button>
+    <span style="color:#888;margin-left:10px;">Zoom</span>
+    <input id="zoom-slider" type="range" min="1" max="10" step="0.5" value="1" style="width:100px;">
+    <span id="time-display">0.00s / 60.00s</span>
+  </div>
+
+  <div id="tabs">
+    <div class="tab active" data-tab="cue-manager">Cue Manager</div>
+    <div class="tab" data-tab="mapping">Mapping</div>
+  </div>
+
+  <!-- CUE MANAGER VIEW -->
+  <div id="view-cue-manager" class="view active">
+    <div id="cue-ruler" style="height:25px;background:#0a0a1a;position:relative;overflow:hidden;cursor:pointer;flex-shrink:0;">
+      <canvas id="cue-ruler-canvas" style="height:100%;"></canvas>
+    </div>
+    <div id="cue-tracks">
+      <div id="cue-playhead"></div>
+    </div>
+  </div>
+
+  <!-- PATTERN EDITOR VIEW -->
+  <div id="view-pattern-editor" class="view">
+    <!-- DMX grids (shown for DMX patterns) -->
+    <div id="pat-grids" style="display:none;gap:10px;padding:10px;overflow:auto;min-height:150px;flex-shrink:0;border-bottom:1px solid #333;">
+      <div style="flex:1;display:flex;flex-direction:column;">
+        <div style="color:#4ecca3;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Pattern Grid (click to assign)</div>
+        <div id="pat-assign-grid" style="display:grid;gap:3px;flex:1;align-content:start;"></div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;">
+        <div style="color:#e94560;font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Live Output</div>
+        <div id="pat-output-grid" style="display:grid;gap:3px;flex:1;align-content:start;"></div>
+      </div>
+    </div>
+    <!-- EtherCAT panel (shown for Servo patterns) -->
+    <div id="ec-panel" style="display:none;min-height:150px;flex-shrink:0;border-bottom:1px solid #333;overflow:auto;padding:8px;">
+      <div style="display:flex;gap:10px;">
+        <!-- Col 1: Drive Control + Slaves -->
+        <div style="flex:1;min-width:220px;">
+          <div class="ec-section">
+            <div class="ec-section-title">Drive Control</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0;">
+              <button class="ec-btn ec-success" id="ec-btn-enable">Enable All</button>
+              <button class="ec-btn ec-danger" id="ec-btn-disable">Disable All</button>
+              <button class="ec-btn" id="ec-btn-reset">Reset Faults</button>
+              <button class="ec-btn" id="ec-btn-home">Home All</button>
+              <button class="ec-btn" id="ec-btn-set-home">Set Home</button>
+            </div>
+            <button class="ec-btn ec-danger" id="ec-btn-stop" style="width:100%;padding:10px;font-size:14px;font-weight:bold;margin-top:6px;">EMERGENCY STOP</button>
+          </div>
+          <div class="ec-section">
+            <div class="ec-section-title">Slaves Status</div>
+            <div id="ec-slaves-list" style="max-height:120px;overflow-y:auto;">
+              <div style="color:#555;font-size:10px;">No slaves connected</div>
+            </div>
+          </div>
+        </div>
+        <!-- Col 2: Mode-specific controls -->
+        <div style="flex:1;min-width:220px;">
+          <!-- PP/CSP: Position Move -->
+          <div id="ec-position-controls" class="ec-section">
+            <div class="ec-section-title">Position Move (PP/CSP)</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0;">
+              <button class="ec-btn ec-qm" onclick="ecQuickMove(-1.0)">-1.0m</button>
+              <button class="ec-btn ec-qm" onclick="ecQuickMove(-0.5)">-0.5m</button>
+              <button class="ec-btn ec-qm" onclick="ecQuickMove(-0.25)">-0.25m</button>
+              <button class="ec-btn ec-qm" onclick="ecQuickMove(0.25)">+0.25m</button>
+              <button class="ec-btn ec-qm" onclick="ecQuickMove(0.5)">+0.5m</button>
+              <button class="ec-btn ec-qm" onclick="ecQuickMove(1.0)">+1.0m</button>
+            </div>
+            <div class="prop-row" style="margin-top:4px;">
+              <label>Slave</label>
+              <select id="ec-move-slave" style="flex:1;background:#0a0a1a;border:1px solid #333;color:#e0e0e0;padding:3px 6px;border-radius:3px;font-size:11px;">
+                <option value="all">All Slaves</option>
+              </select>
+            </div>
+            <div class="prop-row">
+              <label>Target (m)</label>
+              <input id="ec-move-target" type="number" step="0.01" value="0" placeholder="meters">
+            </div>
+            <div style="display:flex;gap:4px;margin:4px 0;">
+              <button class="ec-btn ec-success" id="ec-btn-move" style="flex:1;">Move</button>
+              <button class="ec-btn" id="ec-btn-move-home" style="flex:1;">Move Home</button>
+            </div>
+            <div class="ec-section-title" style="margin-top:6px;">Per-Slave Targets</div>
+            <div id="ec-move-controls"></div>
+            <button class="ec-btn" id="ec-btn-move-all" style="margin-top:4px;">Move All to Targets</button>
+          </div>
+          <!-- PV: Velocity -->
+          <div id="ec-velocity-controls" class="ec-section" style="display:none;">
+            <div class="ec-section-title">Velocity Control (PV)</div>
+            <div class="prop-row">
+              <label>Slave</label>
+              <select id="ec-vel-slave" style="flex:1;background:#0a0a1a;border:1px solid #333;color:#e0e0e0;padding:3px 6px;border-radius:3px;font-size:11px;">
+                <option value="all">All Slaves</option>
+              </select>
+            </div>
+            <div class="prop-row">
+              <label>PV Speed</label>
+              <input id="ec-pv-speed" type="number" value="50" step="10" min="1">
+              <span style="color:#666;font-size:9px;margin-left:4px;">x1000</span>
+            </div>
+            <button class="ec-btn ec-success" id="ec-btn-forward" style="width:100%;padding:8px;font-size:13px;margin:4px 0;">FORWARD</button>
+            <button class="ec-btn ec-danger" id="ec-btn-vel-stop" style="width:100%;padding:8px;font-size:13px;margin:4px 0;">STOP</button>
+            <button class="ec-btn" id="ec-btn-backward" style="width:100%;padding:8px;font-size:13px;margin:4px 0;background:#3498db;">BACKWARD</button>
+          </div>
+          <!-- CSP: Speed Calculator -->
+          <div id="ec-csp-calc" class="ec-section" style="display:none;">
+            <div class="ec-section-title">CSP Speed Calculator</div>
+            <div class="prop-row"><label style="width:80px;">Distance (m)</label><input id="calc-dist" type="number" value="1" step="0.1" min="0.01" style="flex:1;"></div>
+            <div class="prop-row"><label style="width:80px;">Duration (s)</label><input id="calc-dur" type="number" value="10" step="0.5" min="0.1" style="flex:1;"></div>
+            <div style="margin:6px 0;padding:6px;background:#0a0a1a;border-radius:4px;font-size:11px;">
+              <div>CSP Velocity: <strong style="color:#4ecca3;"><span id="calc-result">79</span> units/ms</strong></div>
+              <div style="color:#666;font-size:9px;margin-top:2px;">Steps/m: <span id="calc-steps-ref">792,914</span></div>
+            </div>
+            <button class="ec-btn ec-success" id="calc-apply" style="width:100%;font-size:11px;">Apply to All Slaves</button>
+            <button class="ec-btn ec-success" id="calc-apply-step" style="width:100%;font-size:10px;margin-top:3px;">Apply to Selected Step</button>
+          </div>
+          <div id="ec-pos-calc" class="ec-section" style="display:none;">
+            <div class="ec-section-title">Position Calculator</div>
+            <div class="prop-row"><label style="width:80px;">Speed</label><input id="calc-pos-speed" type="number" value="79" step="1" min="1" style="flex:1;"></div>
+            <div class="prop-row"><label style="width:80px;">Time (s)</label><input id="calc-pos-time" type="number" value="10" step="0.1" min="0" style="flex:1;"></div>
+            <div style="margin:6px 0;padding:6px;background:#0a0a1a;border-radius:4px;font-size:11px;">
+              <div>Position: <strong style="color:#f1c40f;"><span id="calc-pos-result">0.9080</span> m</strong></div>
+              <div style="color:#666;font-size:9px;margin-top:2px;">Formula: (Speed × Time × 1000) / steps_per_meter</div>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <button class="ec-btn ec-success" id="calc-pos-apply-s" style="flex:1;font-size:10px;">Apply S</button>
+              <button class="ec-btn ec-success" id="calc-pos-apply-m" style="flex:1;font-size:10px;">Apply M</button>
+              <button class="ec-btn ec-success" id="calc-pos-apply-e" style="flex:1;font-size:10px;">Apply E</button>
+            </div>
+          </div>
+        </div>
+        <!-- Col 3: Motion Sequence -->
+        <div style="flex:1;min-width:250px;">
+          <div class="ec-section">
+            <div class="ec-section-title">Motion Sequence</div>
+            <div class="prop-row"><label>Mode</label>
+              <select id="sp-seq-mode" style="flex:1;background:#0a0a1a;border:1px solid #333;color:#e0e0e0;padding:3px 6px;border-radius:3px;font-size:11px;">
+                <option value="CSP">CSP (Cyclic Sync)</option>
+                <option value="PP">PP (Profile Position)</option>
+                <option value="PV">PV (Profile Velocity)</option>
+              </select>
+            </div>
+            <div class="prop-row"><label>Loop</label>
+              <select id="sp-loop-mode" style="width:80px;">
+                <option value="once">Once</option>
+                <option value="count">N Times</option>
+                <option value="forever">Forever</option>
+              </select>
+              <input id="sp-loop-count" type="number" min="1" value="1" style="width:40px;margin-left:4px;display:none;">
+            </div>
+            <div id="sp-steps-list" style="max-height:250px;overflow-y:auto;margin:4px 0;"></div>
+            <button class="btn-add" id="sp-add-step" style="font-size:10px;padding:4px;">+ Add Step</button>
+            <div style="display:flex;gap:4px;margin-top:4px;">
+              <button class="btn-secondary" id="sp-test-sequence" style="flex:1;font-size:10px;">Test Run</button>
+              <button class="btn-danger" id="sp-stop-sequence" style="flex:1;font-size:10px;">Stop</button>
+            </div>
+          </div>
+        </div>
+        <!-- Col 4: Configuration (mode-dependent) -->
+        <div style="flex:0.8;min-width:180px;">
+          <div class="ec-section">
+            <div class="ec-section-title">Configuration</div>
+            <!-- PV Config -->
+            <div id="cfg-pv" style="display:none;">
+              <div class="prop-row"><label style="width:70px;">Velocity</label><input id="cfg-pv-vel" type="number" value="80000" step="1000" min="0" style="flex:1;"></div>
+              <div class="prop-row"><label style="width:70px;">Accel</label><input id="cfg-pv-accel" type="number" value="6000" step="500" min="0" style="flex:1;"></div>
+              <div class="prop-row"><label style="width:70px;">Decel</label><input id="cfg-pv-decel" type="number" value="6000" step="500" min="0" style="flex:1;"></div>
+              <div class="prop-row"><label style="width:70px;">Steps/M</label><input id="cfg-pv-steps" type="number" value="792914" step="1" min="1" style="flex:1;"></div>
+              <div class="prop-row"><label style="width:70px;">Raw Steps/M</label><input id="cfg-pv-rawsteps" type="number" value="202985985" step="1" min="1" style="flex:1;"></div>
+            </div>
+            <!-- PP Config -->
+            <div id="cfg-pp" style="display:none;">
+              <div class="prop-row"><label style="width:70px;">Velocity</label><input id="cfg-pp-vel" type="number" value="80000" step="1000" min="0" style="flex:1;"></div>
+              <div class="prop-row"><label style="width:70px;">Accel</label><input id="cfg-pp-accel" type="number" value="6000" step="500" min="0" style="flex:1;"></div>
+              <div class="prop-row"><label style="width:70px;">Decel</label><input id="cfg-pp-decel" type="number" value="6000" step="500" min="0" style="flex:1;"></div>
+              <div class="prop-row"><label style="width:70px;">Steps/M</label><input id="cfg-pp-steps" type="number" value="792914" step="1" min="1" style="flex:1;"></div>
+              <div class="prop-row"><label style="width:70px;">Raw Steps/M</label><input id="cfg-pp-rawsteps" type="number" value="202985985" step="1" min="1" style="flex:1;"></div>
+            </div>
+            <!-- CSP Config -->
+            <div id="cfg-csp" style="display:none;">
+              <div class="prop-row"><label style="width:70px;">CSP Vel</label><input id="cfg-csp-vel" type="number" value="100" step="10" min="1" style="flex:1;"></div>
+              <div class="prop-row"><label style="width:70px;">Steps/M</label><input id="cfg-csp-steps" type="number" value="792914" step="1" min="1" style="flex:1;"></div>
+              <div class="prop-row"><label style="width:70px;">Raw Steps/M</label><input id="cfg-csp-rawsteps" type="number" value="202985985" step="1" min="1" style="flex:1;"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Col 5: Log Terminal -->
+        <div style="flex:1;min-width:200px;">
+          <div class="ec-section" style="height:100%;display:flex;flex-direction:column;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div class="ec-section-title">Log</div>
+              <button class="ch-ctrl-btn" id="ec-log-clear" style="font-size:9px;">Clear</button>
+            </div>
+            <div id="ec-log" style="flex:1;background:#0a0a1a;border:1px solid #333;border-radius:3px;padding:4px 6px;font-family:Consolas,monospace;font-size:10px;color:#8f8;overflow-y:auto;max-height:220px;min-height:80px;white-space:pre-wrap;word-break:break-all;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="ruler" style="height:25px;background:#0a0a1a;position:relative;overflow:hidden;cursor:pointer;flex-shrink:0;">
+      <canvas id="ruler-canvas" style="height:100%;"></canvas>
+    </div>
+    <div id="tracks">
+      <div id="playhead"></div>
+    </div>
+  </div>
+
+  <!-- MAPPING VIEW -->
+  <div id="view-mapping" class="view">
+    <div id="map-grid"></div>
+  </div>
+</div>
+
+<div id="map-popup" class="map-popup" style="display:none;">
+  <input id="map-popup-ch" type="number" min="0" placeholder="Channel">
+  <button id="map-popup-ok">Set</button>
+</div>
+
+<script>
+const API = "http://localhost:9981/api/exec";
+const colors = ["#e94560","#4ecca3","#3498db","#f1c40f","#9b59b6","#e67e22","#1abc9c","#e74c3c","#2ecc71","#e91e63"];
+
+// State
+let ecConnected = false;
+let ecSlaves = 0;
+let ecPollTimer = null;
+let cues = []; // [{name, patterns:[{start,rampUp,holdHigh,rampDown,holdLow,startChan,numChans,delay,type}]}]
+let placedCues = []; // [{cueName, startS, lane}]
+let numLanes = 1;
+let selectedCueIdx = -1;
+let editingCueIdx = -1;
+let selectedPatIdx = -1;
+let totalDur = 60;
+let currentTime = 0;
+let lastPollTime = 0;
+let lastServerTime = 0;
+let isRunning = false;
+let isPaused = false;
+let zoom = 1;
+let firstChan = 0;
+let totalChans = 50;
+let currentTab = 'cue-manager';
+let disabledChans = new Set(); // channels that are muted
+let mapCols = 6;
+let mapRows = 4;
+let mapGrid = {}; // {"x,y": channelNumber} e.g. {"0,0": 0, "1,0": 1, ...}
+
+// TD communication
+function tdExec(script) {
+  return fetch(API, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({script:script}) })
+    .then(r => r.text())
+    .then(t => { try { return JSON.parse(t); } catch(e) { console.error("Parse:", t); return null; } })
+    .catch(e => { console.error("Fetch:", e); return null; });
+}
+
+// Save all cues to TD
+function saveCuesToTD() {
+  let s = "import json\n";
+  s += "tbl = dc.op('cues')\n";
+  s += "tbl.clear()\n";
+  s += "tbl.appendRow(['name', 'patterns_json'])\n";
+  cues.forEach(c => {
+    let pjson = JSON.stringify(c.patterns).replace(/'/g, "\\'");
+    s += "tbl.appendRow(['" + c.name.replace(/'/g, "\\'") + "', '" + pjson.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'])\n";
+  });
+  s += "result='ok'";
+  return tdExec(s);
+}
+
+// Save placed cues timeline to TD
+function savePlacedToTD() {
+  let s = "tbl = dc.op('cue_timeline')\n";
+  s += "tbl.clear()\n";
+  s += "tbl.appendRow(['cue_name', 'start_s', 'lane'])\n";
+  placedCues.forEach(pc => {
+    s += "tbl.appendRow(['" + pc.cueName.replace(/'/g, "\\'") + "', " + pc.startS + ", " + (pc.lane || 0) + "])\n";
+  });
+  s += "dc.par.Totaldur = " + totalDur + "\n";
+  s += "result='ok'";
+  return tdExec(s);
+}
+
+function syncAllToTD() {
+  saveCuesToTD();
+  savePlacedToTD();
+}
+
+// Load from TD
+function loadFromTD() {
+  let s = "import json\n";
+  s += "cues_tbl = dc.op('cues')\n";
+  s += "ctl = dc.op('cue_timeline')\n";
+  s += "cue_list = []\n";
+  s += "if cues_tbl and cues_tbl.numRows >= 2:\n";
+  s += "    for r in range(1, cues_tbl.numRows):\n";
+  s += "        cue_list.append({'name': cues_tbl[r,'name'].val, 'patterns': json.loads(cues_tbl[r,'patterns_json'].val)})\n";
+  s += "placed = []\n";
+  s += "if ctl and ctl.numRows >= 2:\n";
+  s += "    for r in range(1, ctl.numRows):\n";
+  s += "        ln = int(ctl[r,'lane'].val) if 'lane' in [ctl[0,c].val for c in range(ctl.numCols)] else 0\n";
+  s += "        placed.append({'cueName': ctl[r,'cue_name'].val, 'startS': float(ctl[r,'start_s'].val), 'lane': ln})\n";
+  s += "dis_tbl = dc.op('disabled_chans')\n";
+  s += "dis = []\n";
+  s += "if dis_tbl and dis_tbl.numRows >= 2:\n";
+  s += "    for r in range(1, dis_tbl.numRows):\n";
+  s += "        dis.append(int(dis_tbl[r,'chan'].val))\n";
+  s += "result={'cues':cue_list,'placed':placed,'total':dc.par.Totaldur.eval(),'maxdeg':dc.par.Maxdegrees.eval(),'lag':dc.par.Lagtime.eval(),'firstch':dc.par.Firstchan.eval(),'totalch':dc.par.Totalchans.eval(),'disabled':dis}";
+  tdExec(s).then(d => {
+    if(d && d.data && d.data.result) {
+      let r = d.data.result;
+      cues = r.cues || [];
+      // Migrate old servo patterns: ensure duration and seq_mode fields exist
+      cues.forEach(c => { if(c.patterns) c.patterns.forEach(p => {
+        if(getPatType(p) === 'servo') {
+          if(!p.duration) { p.duration = 10; p.ramp_up = 10; }
+          if(!p.seq_mode) { p.seq_mode = 'PV'; }
+        }
+      }); });
+      placedCues = r.placed || [];
+      totalDur = r.total || 60;
+      firstChan = r.firstch || 0;
+      totalChans = r.totalch || 50;
+      disabledChans = new Set(r.disabled || []);
+      document.getElementById('totalDur').value = totalDur;
+      setDurMinSec(totalDur);
+      document.getElementById('maxDeg').value = r.maxdeg;
+      document.getElementById('lagTime').value = r.lag;
+      document.getElementById('firstChan').value = firstChan;
+      document.getElementById('totalChans').value = totalChans;
+      renderAll();
+    }
+  });
+}
+
+function pollTime() {
+  let s = "result={'t':dc.par.Currenttime.eval(),'run':dc.par.Run.eval(),'pause':dc.par.Pause.eval()}";
+  tdExec(s).then(d => {
+    if(d && d.data && d.data.result) {
+      let newTime = d.data.result.t;
+      // Detect timeline loop: time jumped backward significantly
+      if(isRunning && _servoScheduleActive && newTime < lastServerTime - 1) {
+        console.log('Timeline looped (poll): ' + lastServerTime.toFixed(1) + 's -> ' + newTime.toFixed(1) + 's, rescheduling servos');
+        // Small delay to let TD settle, then reschedule
+        setTimeout(() => { if(_servoScheduleActive) scheduleServoTriggers(); }, 50);
+      }
+      lastServerTime = newTime;
+      lastPollTime = performance.now();
+      currentTime = lastServerTime;
+      isRunning = d.data.result.run;
+      isPaused = d.data.result.pause;
+      updateControls();
+    }
+    setTimeout(pollTime, 100);
+  }).catch(() => { setTimeout(pollTime, 500); });
+}
+
+function animatePlayhead() {
+  if(isRunning && !isPaused && !isScrubbing) {
+    let elapsed = (performance.now() - lastPollTime) / 1000;
+    currentTime = Math.min(lastServerTime + elapsed, totalDur);
+  }
+  updatePlayheads();
+  requestAnimationFrame(animatePlayhead);
+}
+
+// ============ SERVO TRIGGER SYSTEM ============
+// Pre-schedules servo patterns with setTimeout when Play is pressed
+let _servoTimers = []; // scheduled setTimeout IDs
+
+let _servoScheduleActive = false;
+
+function scheduleServoTriggers() {
+  clearServoTimers();
+  if(!ecConnected) return;
+  _servoScheduleActive = true;
+
+  // Collect all servo patterns to schedule
+  let toSchedule = [];
+
+  // From placed cues on timeline
+  placedCues.forEach(pc => {
+    let cue = cues.find(c => c.name === pc.cueName);
+    if(!cue || !cue.patterns) return;
+    cue.patterns.forEach((p, pi) => {
+      if(getPatType(p) !== 'servo') return;
+      if(p.enabled === false) return;
+      if(!p.steps || p.steps.length === 0) return;
+      toSchedule.push({ p, label: pc.cueName + ':P' + (pi+1), triggerTime: pc.startS + (p.start || 0) });
+    });
+  });
+
+  // If no placed cues have servos, check currently editing cue directly
+  if(toSchedule.length === 0 && editingCueIdx >= 0 && editingCueIdx < cues.length) {
+    let cue = cues[editingCueIdx];
+    if(cue && cue.patterns) {
+      cue.patterns.forEach((p, pi) => {
+        if(getPatType(p) !== 'servo') return;
+        if(p.enabled === false) return;
+        if(!p.steps || p.steps.length === 0) return;
+        toSchedule.push({ p, label: cue.name + ':P' + (pi+1), triggerTime: p.start || 0 });
+      });
+    }
+  }
+
+  let now = currentTime; // current playhead position in seconds
+  // Pre-build request bodies so they're ready to send instantly
+  toSchedule.forEach(item => {
+    let anticipateMs = 500; // fire 500ms early to compensate for HTTP + server latency
+    let delayMs = Math.max(0, (item.triggerTime - now) * 1000 - anticipateMs);
+    let key = item.label + ' @ ' + item.triggerTime.toFixed(1) + 's';
+    // Skip patterns whose trigger time has already passed
+    if(item.triggerTime < now - 0.5) {
+      console.log('Servo skipped (already past): ' + key);
+      return;
+    }
+    // Pre-build the request body now so setTimeout callback is instant
+    let body = _buildServoRequestBody(item.p);
+    console.log('Servo scheduled: ' + key + ' delay=' + delayMs + 'ms (playhead=' + now.toFixed(1) + 's)');
+    let tid = setTimeout(() => {
+      if(!_servoScheduleActive) return;
+      console.log('Servo firing: ' + key + ' t=' + performance.now().toFixed(0));
+      if(body._isPV) {
+        _runPvSequence(item.p.steps, body.loopCount, body.loopForever);
+      } else {
+        // Direct fetch — skip ecFetch logging overhead
+        fetch(EC_API + '/run_sequence', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body.payload)});
+      }
+    }, delayMs);
+    _servoTimers.push(tid);
+  });
+
+  console.log('Total servo patterns scheduled: ' + toSchedule.length);
+}
+
+function clearServoTimers() {
+  _servoScheduleActive = false;
+  _servoTimers.forEach(tid => clearTimeout(tid));
+  _servoTimers = [];
+}
+
+function checkServoTriggers() {
+  // no-op, scheduling is done in scheduleServoTriggers
+}
+
+function _buildServoRequestBody(p) {
+  let seqMode = p.seq_mode || 'CSP';
+  let loopForever = p.loop_mode === 'forever';
+  let loopCount = p.loop_mode === 'count' ? (p.loop_count || 1) : 1;
+  if(seqMode === 'PV') return { _isPV: true, loopCount, loopForever };
+  let steps = p.steps.map(s => {
+    if(seqMode === 'PP') {
+      let posObj = {};
+      (s.positions||'0').split(',').forEach((v,i) => { posObj[String(i)] = parseFloat(v.trim()) || 0; });
+      return { positions: posObj, velocity: s.velocity, accel: s.accel, decel: s.decel, hold: s.hold };
+    } else {
+      let posS = {}, posM = {}, posE = {};
+      (s.pos_s||s.positions||'0').split(',').forEach((v,i) => { posS[String(i)] = parseFloat(v.trim()) || 0; });
+      (s.pos_m||'0').split(',').forEach((v,i) => { posM[String(i)] = parseFloat(v.trim()) || 0; });
+      (s.pos_e||'0').split(',').forEach((v,i) => { posE[String(i)] = parseFloat(v.trim()) || 0; });
+      return { pos_s: posS, pos_m: posM, pos_e: posE, csp_velocity: s.csp_velocity || 100, hold: s.hold, slave: s.slave != null ? String(s.slave) : 'all' };
+    }
+  });
+  return { _isPV: false, payload: { steps, loop_count: loopCount, loop_forever: loopForever, mode: seqMode } };
+}
+
+function _fireServoPattern(p) {
+  let seqMode = p.seq_mode || 'CSP';
+  if(seqMode === 'PV') {
+    _runPvSequence(p.steps, p.loop_mode === 'count' ? (p.loop_count || 1) : 1, p.loop_mode === 'forever');
+  } else {
+    let steps = p.steps.map(s => {
+      if(seqMode === 'PP') {
+        let posObj = {};
+        (s.positions||'0').split(',').forEach((v,i) => { posObj[String(i)] = parseFloat(v.trim()) || 0; });
+        return { positions: posObj, velocity: s.velocity, accel: s.accel, decel: s.decel, hold: s.hold };
+      } else {
+        let posS = {}, posM = {}, posE = {};
+        (s.pos_s||s.positions||'0').split(',').forEach((v,i) => { posS[String(i)] = parseFloat(v.trim()) || 0; });
+        (s.pos_m||'0').split(',').forEach((v,i) => { posM[String(i)] = parseFloat(v.trim()) || 0; });
+        (s.pos_e||'0').split(',').forEach((v,i) => { posE[String(i)] = parseFloat(v.trim()) || 0; });
+        return { pos_s: posS, pos_m: posM, pos_e: posE, csp_velocity: s.csp_velocity || 100, hold: s.hold, slave: s.slave != null ? String(s.slave) : 'all' };
+      }
+    });
+    let loopForever = p.loop_mode === 'forever';
+    let loopCount = p.loop_mode === 'count' ? (p.loop_count || 1) : 1;
+    ecFetch('/run_sequence', { steps: steps, loop_count: loopCount, loop_forever: loopForever, mode: seqMode }).then(d => {
+      if(d.error) console.error('Servo sequence error:', d.error);
+      else ecLog('Servo triggered: ' + (d.message || 'OK'), 'ok');
+    });
+  }
+}
+
+// Cue duration = max end time of all its patterns
+function getCueDuration(cue) {
+  let maxEnd = 0;
+  cue.patterns.forEach(p => {
+    let patDur = p.ramp_up + p.hold_high + p.ramp_down + p.hold_low;
+    let lastChStart = p.start + (p.num_chans - 1) * (p.delay_ms / 1000);
+    let end = lastChStart + patDur;
+    if(end > maxEnd) maxEnd = end;
+  });
+  return maxEnd;
+}
+
+function getPatDur(p) {
+  if(getPatType(p) === 'servo') {
+    if(p.steps && p.steps.length > 0) {
+      let total = 0;
+      let mode = p.seq_mode || 'CSP';
+      p.steps.forEach(s => {
+        if(mode === 'PV') {
+          total += (s.duration || 2);
+        } else if(mode === 'CSP') {
+          // Estimate move time from positions and speed: time = (pos * 870) / speed
+          let speed = s.csp_velocity || 100;
+          let posS = Math.abs(parseFloat(s.pos_s) || 0);
+          let posM = Math.abs(parseFloat(s.pos_m) || 0);
+          let posE = Math.abs(parseFloat(s.pos_e) || 0);
+          let distSM = Math.abs(posM - posS);
+          let distME = Math.abs(posE - posM);
+          let moveSM = distSM > 0 ? (distSM * 870) / speed : 0;
+          let moveME = distME > 0 ? (distME * 870) / speed : 0;
+          total += moveSM + (s.hold || 0) + moveME;
+        } else {
+          total += (s.hold || 1);
+        }
+      });
+      let loops = p.loop_mode === 'count' ? (p.loop_count || 1) : 1;
+      return Math.max(1, total) * loops;
+    }
+    return p.duration || 10;
+  }
+  return p.ramp_up + p.hold_high + p.ramp_down + p.hold_low;
+}
+
+function getLaneWidth(containerId) {
+  let container = document.getElementById(containerId || (currentTab === 'cue-manager' ? 'cue-tracks' : 'tracks'));
+  let baseW = container.clientWidth - 60;
+  if(baseW <= 0) baseW = 800; // fallback for hidden containers
+  return baseW * zoom;
+}
+
+// ============ RENDER ALL ============
+function renderAll() {
+  renderCueList();
+  renderCueTimeline();
+  renderPatternList();
+  renderPatternTracks();
+  renderChanToggles();
+  if(currentTab === 'mapping') renderMapGrid();
+  renderPatAssignGrid();
+  renderOutputGrid();
+}
+
+function renderChanToggles() {
+  let container = document.getElementById('chan-toggles');
+  container.innerHTML = '';
+  for(let ch = firstChan; ch < firstChan + totalChans; ch++) {
+    let btn = document.createElement('div');
+    btn.className = 'ch-toggle' + (disabledChans.has(ch) ? '' : ' active');
+    btn.textContent = ch;
+    btn.addEventListener('click', () => {
+      if(disabledChans.has(ch)) disabledChans.delete(ch);
+      else disabledChans.add(ch);
+      syncDisabledToTD();
+      renderChanToggles();
+    });
+    container.appendChild(btn);
+  }
+}
+
+function syncDisabledToTD() {
+  let arr = Array.from(disabledChans);
+  let s = "import json\n";
+  s += "ctrl = dc\n";
+  s += "tbl = ctrl.op('disabled_chans')\n";
+  s += "if tbl is None:\n";
+  s += "    tbl = ctrl.create(td.tableDAT, 'disabled_chans')\n";
+  s += "tbl.clear()\n";
+  s += "tbl.appendRow(['chan'])\n";
+  arr.forEach(ch => { s += "tbl.appendRow([" + ch + "])\n"; });
+  s += "result='ok'";
+  tdExec(s);
+}
+
+// ============ CUE LIST (sidebar) ============
+function renderCueList() {
+  let list = document.getElementById('cue-list');
+  list.innerHTML = '';
+  cues.forEach((c, i) => {
+    let div = document.createElement('div');
+    div.className = 'list-item' + (i === selectedCueIdx ? ' selected' : '');
+    div.style.borderLeft = '3px solid ' + colors[i % colors.length];
+    let dur = getCueDuration(c);
+    div.setAttribute('draggable', 'true');
+    div.innerHTML = '<span>' + c.name + ' (' + dur.toFixed(1) + 's)</span><button class="del-btn" data-i="' + i + '">x</button>';
+    div.addEventListener('click', () => { selectedCueIdx = i; renderAll(); });
+    div.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', JSON.stringify({type:'cue', index:i, name:c.name}));
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+    div.querySelector('.del-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      // Remove from placed too
+      placedCues = placedCues.filter(pc => pc.cueName !== cues[i].name);
+      cues.splice(i, 1);
+      if(selectedCueIdx >= cues.length) selectedCueIdx = cues.length - 1;
+      if(editingCueIdx >= cues.length) { editingCueIdx = -1; switchToTab('cue-manager'); }
+      syncAllToTD();
+      renderAll();
+    });
+    list.appendChild(div);
+  });
+
+  // Cue props
+  let cp = document.getElementById('cue-props');
+  if(selectedCueIdx >= 0 && selectedCueIdx < cues.length) {
+    cp.style.display = 'block';
+    document.getElementById('cue-name').value = cues[selectedCueIdx].name;
+  } else {
+    cp.style.display = 'none';
+  }
+
+  // Placed cues list
+  renderPlacedList();
+}
+
+function renderPlacedList() {
+  let list = document.getElementById('placed-list');
+  list.innerHTML = '';
+  if(placedCues.length === 0) {
+    document.getElementById('sidebar-placed').style.display = 'none';
+    return;
+  }
+  document.getElementById('sidebar-placed').style.display = 'block';
+  placedCues.forEach((pc, i) => {
+    let cueIdx = cues.findIndex(c => c.name === pc.cueName);
+    let div = document.createElement('div');
+    div.className = 'list-item';
+    div.style.borderLeft = '3px solid ' + colors[(cueIdx >= 0 ? cueIdx : i) % colors.length];
+    div.innerHTML = '<span>' + pc.cueName + ' @ ' + pc.startS.toFixed(1) + 's [DNA' + ((pc.lane||0)+1) + ']</span><button class="del-btn" data-i="' + i + '">x</button>';
+    div.querySelector('.del-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      placedCues.splice(i, 1);
+      savePlacedToTD();
+      renderAll();
+    });
+    list.appendChild(div);
+  });
+}
+
+// ============ CUE TIMELINE (main area) ============
+function renderCueTimeline() {
+  let container = document.getElementById('cue-tracks');
+  let ph = document.getElementById('cue-playhead');
+  container.innerHTML = '';
+  container.appendChild(ph);
+
+  let laneW = getLaneWidth('cue-tracks');
+
+  // Auto-calculate lanes: max lane used + 1 empty lane for new drops
+  let maxLane = 0;
+  placedCues.forEach(pc => { if((pc.lane || 0) > maxLane) maxLane = pc.lane || 0; });
+  numLanes = maxLane + 2; // +1 for used lanes, +1 for empty drop target
+
+  for(let laneIdx = 0; laneIdx < numLanes; laneIdx++) {
+    let track = document.createElement('div');
+    track.className = 'cue-track';
+    track.innerHTML = '<div class="cue-track-label">DNA ' + (laneIdx + 1) + '</div><div class="cue-track-lane" data-lane="' + laneIdx + '" style="width:' + laneW + 'px;height:100%;"></div>';
+    container.appendChild(track);
+    let lane = track.querySelector('.cue-track-lane');
+
+    // Drop zone for dragging cues from sidebar
+    (function(ln, li) {
+      ln.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; ln.style.background = '#1a2a4a'; });
+      ln.addEventListener('dragleave', () => { ln.style.background = ''; });
+      ln.addEventListener('drop', e => {
+        e.preventDefault();
+        ln.style.background = '';
+        try {
+          let data = JSON.parse(e.dataTransfer.getData('text/plain'));
+          if(data.type === 'cue' && data.index >= 0 && data.index < cues.length) {
+            let laneRect = ln.getBoundingClientRect();
+            let x = e.clientX - laneRect.left;
+            let cueDur = getCueDuration(cues[data.index]);
+            let startS = Math.max(0, Math.min(totalDur - cueDur, Math.round((x / laneRect.width) * totalDur * 10) / 10));
+            placedCues.push({ cueName: data.name, startS: startS, lane: li });
+            savePlacedToTD();
+            renderAll();
+          }
+        } catch(err) {}
+      });
+    })(lane, laneIdx);
+
+    // Place cue blocks for this lane
+    placedCues.forEach((pc, pi) => {
+      if((pc.lane || 0) !== laneIdx) return;
+      let cueIdx = cues.findIndex(c => c.name === pc.cueName);
+      let cue = cueIdx >= 0 ? cues[cueIdx] : null;
+      let dur = cue ? getCueDuration(cue) : 5;
+      let left = (pc.startS / totalDur) * 100;
+      let width = (dur / totalDur) * 100;
+
+      let block = document.createElement('div');
+      block.className = 'cue-block';
+      block.style.left = left + '%';
+      block.style.width = width + '%';
+      block.style.background = colors[(cueIdx >= 0 ? cueIdx : pi) % colors.length] + 'cc';
+      block.innerHTML = '<span style="pointer-events:none;">' + pc.cueName + '</span><span class="cue-del" data-i="' + pi + '">&times;</span>';
+
+      // Drag to reposition
+      (function(ln, pc2, dur2, pi2) {
+        block.addEventListener('mousedown', e => {
+          if(e.target.classList.contains('cue-del')) return;
+          e.preventDefault();
+          let laneRect = ln.getBoundingClientRect();
+          let startX = e.clientX;
+          let origStart = pc2.startS;
+          function onMove(ev) {
+            let dx = ev.clientX - startX;
+            let dt = (dx / laneRect.width) * totalDur;
+            let maxStart = totalDur - dur2;
+            pc2.startS = Math.max(0, Math.min(maxStart, Math.round((origStart + dt) * 10) / 10));
+            renderAll();
+          }
+          function onUp() {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            savePlacedToTD();
+          }
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        });
+
+        block.querySelector('.cue-del').addEventListener('click', e => {
+          e.stopPropagation();
+          placedCues.splice(pi2, 1);
+          savePlacedToTD();
+          renderAll();
+        });
+      })(lane, pc, dur, pi);
+
+      // Double click to edit cue patterns
+      block.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        if(cueIdx >= 0) {
+          selectedCueIdx = cueIdx;
+          editingCueIdx = cueIdx;
+          selectedPatIdx = -1;
+          switchToTab('pattern-editor');
+          renderAll();
+        }
+      });
+
+      lane.appendChild(block);
+    });
+  }
+
+  renderCueRuler();
+}
+
+function renderCueRuler() {
+  let canvas = document.getElementById('cue-ruler-canvas');
+  let rect = canvas.parentElement.getBoundingClientRect();
+  let laneW = getLaneWidth('cue-tracks');
+  let totalW = 60 + laneW;
+  canvas.width = totalW;
+  canvas.height = rect.height;
+  canvas.style.width = totalW + 'px';
+  let ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let step = totalDur <= 30 ? 1 : totalDur <= 120 ? 5 : 10;
+  for(let t = 0; t <= totalDur; t += step) {
+    let x = 60 + (t / totalDur) * laneW;
+    ctx.fillStyle = '#444';
+    ctx.fillRect(x, 15, 1, 10);
+    ctx.fillStyle = '#888';
+    ctx.font = '10px Arial';
+    ctx.fillText(t + 's', x + 2, 12);
+  }
+}
+
+// ============ PATTERN EDITOR ============
+function getPatType(p) { return p.type || 'dmx'; }
+
+function renderPatternList() {
+  if(editingCueIdx < 0 || editingCueIdx >= cues.length) return;
+  let cue = cues[editingCueIdx];
+  let list = document.getElementById('pattern-list');
+  list.innerHTML = '';
+  cue.patterns.forEach((p, i) => {
+    if(p.enabled === undefined) p.enabled = true;
+    let div = document.createElement('div');
+    div.className = 'list-item' + (i === selectedPatIdx ? ' selected' : '');
+    div.style.borderLeft = '3px solid ' + colors[i % colors.length];
+    if(!p.enabled) div.style.opacity = '0.4';
+    let ptype = getPatType(p);
+    let label = '';
+    if(ptype === 'servo') {
+      let stepCount = (p.steps ? p.steps.length : 1);
+      let loopLabel = p.loop_mode === 'forever' ? ' ∞' : (p.loop_mode === 'count' && p.loop_count > 1 ? ' x' + p.loop_count : '');
+      label = '<span style="background:#f1c40f;color:#1a1a2e;padding:0 4px;border-radius:2px;font-size:9px;font-weight:bold;margin-right:4px;">SERVO</span>P' + (i+1) + ' ' + stepCount + 'steps' + loopLabel + ' @ ' + p.start.toFixed(1) + 's';
+    } else {
+      label = '<span style="background:#4ecca3;color:#1a1a2e;padding:0 4px;border-radius:2px;font-size:9px;font-weight:bold;margin-right:4px;">DMX</span>P' + (i+1) + ' ch' + p.start_chan + '-' + (p.start_chan + p.num_chans - 1) + ' @ ' + p.start.toFixed(1) + 's';
+    }
+    let onOffColor = p.enabled ? '#4ecca3' : '#e94560';
+    let onOffText = p.enabled ? 'ON' : 'OFF';
+    div.innerHTML = '<span>' + label + '</span><span style="display:flex;align-items:center;gap:3px;"><button class="pat-toggle" style="font-size:9px;padding:1px 5px;border:1px solid ' + onOffColor + ';background:transparent;color:' + onOffColor + ';border-radius:2px;cursor:pointer;">' + onOffText + '</button><button class="del-btn" data-i="' + i + '">x</button></span>';
+    div.addEventListener('click', (e) => { if(!e.target.classList.contains('pat-toggle') && !e.target.classList.contains('del-btn')) { selectedPatIdx = i; renderAll(); } });
+    div.querySelector('.pat-toggle').addEventListener('click', e => {
+      e.stopPropagation();
+      p.enabled = !p.enabled;
+      if(!p.enabled && getPatType(p) === 'servo') {
+        // Stop running sequence and clear scheduled timers when toggling OFF
+        clearServoTimers();
+        _seqStop = true;
+        ecFetch('/stop_sequence');
+      }
+      saveCuesToTD();
+      renderAll();
+    });
+    div.querySelector('.del-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      cue.patterns.splice(i, 1);
+      if(selectedPatIdx >= cue.patterns.length) selectedPatIdx = cue.patterns.length - 1;
+      saveCuesToTD(); savePlacedToTD();
+      renderAll();
+    });
+    list.appendChild(div);
+  });
+
+  // Props
+  let pp = document.getElementById('props-panel');
+  if(selectedPatIdx >= 0 && selectedPatIdx < cue.patterns.length) {
+    pp.style.display = 'block';
+    let p = cue.patterns[selectedPatIdx];
+    let ptype = getPatType(p);
+    let badge = document.getElementById('pat-type-badge');
+    if(ptype === 'servo') {
+      badge.textContent = 'SERVO';
+      badge.style.background = '#f1c40f';
+      badge.style.color = '#1a1a2e';
+      document.getElementById('dmx-props').style.display = 'none';
+      document.getElementById('servo-props').style.display = 'block';
+      document.getElementById('dmx-sidebar-section').style.display = 'none';
+      document.getElementById('sp-start').value = p.start;
+      document.getElementById('sp-duration').value = p.duration || 10;
+      // Migrate old format: if pattern has positions string but no steps array
+      if(!p.steps) {
+        p.steps = [{positions: p.positions || '0.0', velocity: 80000, accel: 6000, decel: 6000, hold: 1.0}];
+        p.loop_mode = 'once';
+        p.loop_count = 1;
+      }
+      document.getElementById('sp-seq-mode').value = p.seq_mode || 'CSP';
+      document.getElementById('ec-mode').value = p.seq_mode || 'CSP';
+      document.getElementById('sp-loop-mode').value = p.loop_mode || 'once';
+      document.getElementById('sp-loop-count').value = p.loop_count || 1;
+      document.getElementById('sp-loop-count').style.display = (p.loop_mode === 'count') ? 'inline-block' : 'none';
+      renderServoSteps(p);
+      updateCfgPanel(p);
+      // Show EtherCAT panel, hide DMX grids
+      document.getElementById('pat-grids').style.display = 'none';
+      document.getElementById('ec-panel').style.display = 'block';
+      startEcPolling();
+    } else {
+      badge.textContent = 'DMX';
+      badge.style.background = '#4ecca3';
+      badge.style.color = '#1a1a2e';
+      document.getElementById('dmx-props').style.display = 'block';
+      document.getElementById('servo-props').style.display = 'none';
+      document.getElementById('dmx-sidebar-section').style.display = 'block';
+      document.getElementById('p-start').value = p.start;
+      document.getElementById('p-rampup').value = p.ramp_up;
+      document.getElementById('p-holdhigh').value = p.hold_high;
+      document.getElementById('p-rampdown').value = p.ramp_down;
+      document.getElementById('p-holdlow').value = p.hold_low;
+      document.getElementById('p-startchan').value = p.start_chan;
+      document.getElementById('p-numchans').value = p.num_chans;
+      document.getElementById('p-delay').value = p.delay_ms;
+      // Show DMX grids, hide EtherCAT panel
+      document.getElementById('pat-grids').style.display = 'flex';
+      document.getElementById('ec-panel').style.display = 'none';
+      stopEcPolling();
+    }
+  } else {
+    pp.style.display = 'none';
+    document.getElementById('pat-grids').style.display = 'flex';
+    document.getElementById('ec-panel').style.display = 'none';
+    document.getElementById('dmx-sidebar-section').style.display = 'block';
+    stopEcPolling();
+  }
+}
+
+function renderPatternTracks() {
+  if(editingCueIdx < 0 || editingCueIdx >= cues.length) return;
+  let cue = cues[editingCueIdx];
+  let container = document.getElementById('tracks');
+  let ph = document.getElementById('playhead');
+  container.innerHTML = '';
+  container.appendChild(ph);
+
+  let laneW = getLaneWidth('tracks');
+
+  // One lane per pattern, plus one empty lane for visual space
+  let numPatLanes = cue.patterns.length + 1;
+
+  for(let laneIdx = 0; laneIdx < numPatLanes; laneIdx++) {
+    let track = document.createElement('div');
+    track.className = 'cue-track';
+    let label = laneIdx < cue.patterns.length ? 'P' + (laneIdx + 1) : '';
+    track.innerHTML = '<div class="cue-track-label">' + label + '</div><div class="cue-track-lane" style="width:' + laneW + 'px;height:100%;"></div>';
+    container.appendChild(track);
+    let lane = track.querySelector('.cue-track-lane');
+
+    if(laneIdx >= cue.patterns.length) continue;
+
+    let p = cue.patterns[laneIdx];
+    let pi = laneIdx;
+    let ptype = getPatType(p);
+    let patFullDur = ptype === 'servo' ? getPatDur(p) : getPatDur(p) + (p.num_chans - 1) * (p.delay_ms / 1000);
+    let left = (p.start / totalDur) * 100;
+    let width = (patFullDur / totalDur) * 100;
+
+    let block = document.createElement('div');
+    block.className = 'cue-block';
+    block.style.left = left + '%';
+    block.style.width = width + '%';
+    let blockColor = ptype === 'servo' ? '#f1c40f' : colors[pi % colors.length];
+    block.style.background = blockColor + 'cc';
+    block.style.border = pi === selectedPatIdx ? '2px solid #fff' : '2px solid rgba(255,255,255,0.3)';
+    if(p.enabled === false) { block.style.opacity = '0.3'; block.style.filter = 'grayscale(1)'; }
+    let offLabel = p.enabled === false ? ' [OFF]' : '';
+    let blockLabel = ptype === 'servo' ? 'SERVO P' + (pi+1) + offLabel : 'P' + (pi + 1) + ' (Ch' + p.start_chan + '-' + (p.start_chan + p.num_chans - 1) + ')' + offLabel;
+    block.innerHTML = '<span style="pointer-events:none;">' + blockLabel + '</span><span class="cue-del" data-i="' + pi + '">&times;</span>';
+
+    block.addEventListener('click', e => {
+      if(e.target.classList.contains('cue-del')) return;
+      e.stopPropagation();
+      selectedPatIdx = pi;
+      renderAll();
+    });
+
+    // Delete pattern
+    block.querySelector('.cue-del').addEventListener('click', e => {
+      e.stopPropagation();
+      cue.patterns.splice(pi, 1);
+      if(selectedPatIdx >= cue.patterns.length) selectedPatIdx = cue.patterns.length - 1;
+      saveCuesToTD(); savePlacedToTD();
+      renderAll();
+    });
+
+    // Drag pattern start
+    (function(ln, p2, pi2) {
+      block.addEventListener('mousedown', e => {
+        if(e.target.classList.contains('cue-del')) return;
+        e.preventDefault();
+        let laneRect = ln.getBoundingClientRect();
+        let startX = e.clientX;
+        let origStart = p2.start;
+        function onMove(ev) {
+          let dx = ev.clientX - startX;
+          let dt = (dx / laneRect.width) * totalDur;
+          let patFullDur2 = getPatDur(p2) + (p2.num_chans - 1) * (p2.delay_ms / 1000);
+          let maxStart = totalDur - patFullDur2;
+          p2.start = Math.max(0, Math.min(maxStart, Math.round((origStart + dt) * 10) / 10));
+          renderAll();
+        }
+        function onUp() {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          saveCuesToTD(); savePlacedToTD();
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    })(lane, p, pi);
+
+    lane.appendChild(block);
+  }
+
+  renderPatternRuler();
+}
+
+function renderPatternRuler() {
+  let canvas = document.getElementById('ruler-canvas');
+  let rect = canvas.parentElement.getBoundingClientRect();
+  let laneW = getLaneWidth('tracks');
+  let totalW = 60 + laneW;
+  canvas.width = totalW;
+  canvas.height = rect.height;
+  canvas.style.width = totalW + 'px';
+  let ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let step = totalDur <= 10 ? 0.5 : totalDur <= 30 ? 1 : totalDur <= 120 ? 5 : 10;
+  for(let t = 0; t <= totalDur; t += step) {
+    let x = 60 + (t / totalDur) * laneW;
+    ctx.fillStyle = '#444';
+    ctx.fillRect(x, 15, 1, 10);
+    ctx.fillStyle = '#888';
+    ctx.font = '10px Arial';
+    ctx.fillText(t.toFixed(step < 1 ? 1 : 0) + 's', x + 2, 12);
+  }
+}
+
+// ============ MAPPING GRID ============
+let mapPopupCell = null; // {x, y} of cell being edited
+let mapNextChan = 0; // auto-increment channel number
+
+function renderMapGrid() {
+  let container = document.getElementById('map-grid');
+  container.innerHTML = '';
+  container.style.gridTemplateColumns = 'repeat(' + mapCols + ', 1fr)';
+
+  for(let y = 0; y < mapRows; y++) {
+    for(let x = 0; x < mapCols; x++) {
+      let cell = document.createElement('div');
+      let key = x + ',' + y;
+      let ch = mapGrid[key];
+      let assigned = ch !== undefined && ch !== null;
+      cell.className = 'map-cell' + (assigned ? ' assigned' : '');
+      cell.dataset.x = x;
+      cell.dataset.y = y;
+
+      let posLabel = '<span class="cell-pos">' + x + ',' + y + '</span>';
+      if(assigned) {
+        cell.innerHTML = posLabel + '<span class="cell-ch">Ch ' + ch + '</span><span class="cell-remove" data-key="' + key + '">&times;</span>';
+      } else {
+        cell.innerHTML = posLabel + '<span style="color:#555;">empty</span>';
+      }
+
+      cell.addEventListener('click', e => {
+        if(e.target.classList.contains('cell-remove')) {
+          delete mapGrid[key];
+          saveMapToTD();
+          renderMapGrid();
+          return;
+        }
+        showMapPopup(e, x, y);
+      });
+
+      container.appendChild(cell);
+    }
+  }
+}
+
+function showMapPopup(e, x, y) {
+  let popup = document.getElementById('map-popup');
+  let key = x + ',' + y;
+  let existing = mapGrid[key];
+  // Always show next auto-increment value
+  document.getElementById('map-popup-ch').value = mapNextChan;
+  popup.style.display = 'block';
+  popup.style.left = e.clientX + 'px';
+  popup.style.top = e.clientY + 'px';
+  mapPopupCell = { x: x, y: y };
+  document.getElementById('map-popup-ch').focus();
+  document.getElementById('map-popup-ch').select();
+}
+
+document.getElementById('map-popup-ok').addEventListener('click', () => {
+  if(!mapPopupCell) return;
+  let ch = parseInt(document.getElementById('map-popup-ch').value);
+  let key = mapPopupCell.x + ',' + mapPopupCell.y;
+  if(isNaN(ch)) {
+    delete mapGrid[key];
+  } else {
+    mapGrid[key] = ch;
+    mapNextChan = ch + 1; // auto-increment for next click
+  }
+  document.getElementById('map-popup').style.display = 'none';
+  mapPopupCell = null;
+  saveMapToTD();
+  renderMapGrid();
+});
+
+document.getElementById('map-popup-ch').addEventListener('keydown', e => {
+  if(e.key === 'Enter') document.getElementById('map-popup-ok').click();
+  if(e.key === 'Escape') { document.getElementById('map-popup').style.display = 'none'; mapPopupCell = null; }
+});
+
+// Close popup on outside click
+document.addEventListener('click', e => {
+  let popup = document.getElementById('map-popup');
+  if(popup.style.display === 'block' && !popup.contains(e.target) && !e.target.classList.contains('map-cell')) {
+    popup.style.display = 'none';
+    mapPopupCell = null;
+  }
+});
+
+function saveMapToTD() {
+  let s = "import json\ntbl = dc.op('chan_map')\n";
+  s += "if tbl is None:\n    tbl = dc.create(tableDAT, 'chan_map')\n";
+  s += "tbl.clear()\ntbl.appendRow(['key','value'])\n";
+  s += "tbl.appendRow(['cols', " + mapCols + "])\n";
+  s += "tbl.appendRow(['rows', " + mapRows + "])\n";
+  let gridJson = JSON.stringify(mapGrid);
+  let b64 = btoa(unescape(encodeURIComponent(gridJson)));
+  s += "import base64\n";
+  s += "tbl.appendRow(['grid', base64.b64decode('" + b64 + "').decode('utf-8')])\n";
+  s += "result='ok'";
+  tdExec(s);
+}
+
+function loadMapFromTD() {
+  let s = "import json\ntbl = dc.op('chan_map')\nresult = None\n";
+  s += "if tbl and tbl.numRows >= 2:\n";
+  s += "    d = {}\n";
+  s += "    for r in range(1, tbl.numRows):\n";
+  s += "        d[tbl[r,'key'].val] = tbl[r,'value'].val\n";
+  s += "    result = d";
+  tdExec(s).then(d => {
+    if(d && d.data && d.data.result) {
+      let r = d.data.result;
+      mapCols = parseInt(r.cols) || 6;
+      mapRows = parseInt(r.rows) || 4;
+      try { mapGrid = JSON.parse(r.grid || '{}'); } catch(e) { mapGrid = {}; }
+      document.getElementById('map-cols').value = mapCols;
+      document.getElementById('map-rows').value = mapRows;
+      renderMapGrid();
+    }
+  });
+}
+
+// ============ PATTERN ASSIGN GRID ============
+let patDragStart = null;
+let patDragEnd = null;
+let patDragging = false;
+
+function getPatChanSet() {
+  if(editingCueIdx < 0 || selectedPatIdx < 0 || !cues[editingCueIdx] || !cues[editingCueIdx].patterns[selectedPatIdx]) return new Set();
+  let pat = cues[editingCueIdx].patterns[selectedPatIdx];
+  if(pat.channels && pat.channels.length > 0) return new Set(pat.channels);
+  let s = new Set();
+  for(let i = 0; i < pat.num_chans; i++) s.add(pat.start_chan + i);
+  return s;
+}
+
+function renderPatAssignGrid() {
+  let container = document.getElementById('pat-assign-grid');
+  container.innerHTML = '';
+  container.style.gridTemplateColumns = 'repeat(' + mapCols + ', 1fr)';
+  container.style.userSelect = 'none';
+  container.style.position = 'relative';
+
+  let patChans = getPatChanSet();
+  let hasPat = editingCueIdx >= 0 && selectedPatIdx >= 0;
+
+  // Drag selection bounds
+  let selMinX = -1, selMaxX = -1, selMinY = -1, selMaxY = -1;
+  if(patDragStart && patDragEnd) {
+    selMinX = Math.min(patDragStart.x, patDragEnd.x);
+    selMaxX = Math.max(patDragStart.x, patDragEnd.x);
+    selMinY = Math.min(patDragStart.y, patDragEnd.y);
+    selMaxY = Math.max(patDragStart.y, patDragEnd.y);
+  }
+
+  for(let y = 0; y < mapRows; y++) {
+    for(let x = 0; x < mapCols; x++) {
+      let cell = document.createElement('div');
+      let key = x + ',' + y;
+      let ch = mapGrid[key];
+      let assigned = ch !== undefined && ch !== null;
+      let inPat = hasPat && assigned && patChans.has(ch);
+      let inSel = x >= selMinX && x <= selMaxX && y >= selMinY && y <= selMaxY;
+
+      cell.className = 'pat-cell' + (inPat ? ' pat-active' : '');
+      if(inSel) { cell.style.outline = '2px solid #e94560'; cell.style.outlineOffset = '-2px'; }
+      if(assigned) {
+        cell.innerHTML = '<span class="pat-pos">' + x + ',' + y + '</span><span class="pat-ch">Ch ' + ch + '</span>';
+      } else {
+        cell.innerHTML = '<span class="pat-pos">' + x + ',' + y + '</span><span style="color:#444;">--</span>';
+      }
+
+      cell.dataset.gx = x;
+      cell.dataset.gy = y;
+      container.appendChild(cell);
+    }
+  }
+
+  if(!hasPat) {
+    let msg = document.createElement('div');
+    msg.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;color:#555;font-size:11px;pointer-events:none;';
+    msg.textContent = 'Select a pattern to assign channels';
+    container.appendChild(msg);
+  }
+}
+
+// Drag selection on pat-assign-grid
+(function() {
+  let grid = document.getElementById('pat-assign-grid');
+
+  function cellFromEvent(e) {
+    let el = document.elementFromPoint(e.clientX, e.clientY);
+    if(el) el = el.closest('.pat-cell');
+    return el;
+  }
+
+  grid.addEventListener('mousedown', e => {
+    let cell = cellFromEvent(e);
+    if(!cell || editingCueIdx < 0 || selectedPatIdx < 0) return;
+    e.preventDefault();
+    patDragStart = { x: parseInt(cell.dataset.gx), y: parseInt(cell.dataset.gy) };
+    patDragEnd = { x: patDragStart.x, y: patDragStart.y };
+    patDragging = true;
+    updateSelectionHighlight();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if(!patDragging) return;
+    let cell = cellFromEvent(e);
+    if(cell && cell.dataset.gx !== undefined) {
+      let nx = parseInt(cell.dataset.gx);
+      let ny = parseInt(cell.dataset.gy);
+      if(!patDragEnd || patDragEnd.x !== nx || patDragEnd.y !== ny) {
+        patDragEnd = { x: nx, y: ny };
+        updateSelectionHighlight();
+      }
+    }
+  });
+
+  document.addEventListener('mouseup', e => {
+    if(!patDragging) return;
+    patDragging = false;
+    if(!patDragStart || !patDragEnd || editingCueIdx < 0 || selectedPatIdx < 0) {
+      patDragStart = null; patDragEnd = null;
+      clearSelectionHighlight();
+      return;
+    }
+
+    let pat = cues[editingCueIdx].patterns[selectedPatIdx];
+    let minX = Math.min(patDragStart.x, patDragEnd.x);
+    let maxX = Math.max(patDragStart.x, patDragEnd.x);
+    let minY = Math.min(patDragStart.y, patDragEnd.y);
+    let maxY = Math.max(patDragStart.y, patDragEnd.y);
+
+    let selectedChans = [];
+    for(let y = minY; y <= maxY; y++) {
+      for(let x = minX; x <= maxX; x++) {
+        let ch = mapGrid[x + ',' + y];
+        if(ch !== undefined && ch !== null) selectedChans.push(ch);
+      }
+    }
+
+    if(selectedChans.length > 0) {
+      // Remove duplicates and sort
+      selectedChans = [...new Set(selectedChans)].sort((a,b) => a - b);
+      pat.channels = selectedChans;
+      pat.start_chan = selectedChans[0];
+      pat.num_chans = selectedChans.length;
+      saveCuesToTD(); savePlacedToTD();
+    }
+
+    patDragStart = null;
+    patDragEnd = null;
+    renderAll();
+  });
+
+  function updateSelectionHighlight() {
+    let cells = grid.querySelectorAll('.pat-cell');
+    let minX = Math.min(patDragStart.x, patDragEnd.x);
+    let maxX = Math.max(patDragStart.x, patDragEnd.x);
+    let minY = Math.min(patDragStart.y, patDragEnd.y);
+    let maxY = Math.max(patDragStart.y, patDragEnd.y);
+    cells.forEach(c => {
+      let cx = parseInt(c.dataset.gx);
+      let cy = parseInt(c.dataset.gy);
+      if(cx >= minX && cx <= maxX && cy >= minY && cy <= maxY) {
+        c.style.outline = '2px solid #e94560';
+        c.style.outlineOffset = '-2px';
+      } else {
+        c.style.outline = '';
+        c.style.outlineOffset = '';
+      }
+    });
+  }
+
+  function clearSelectionHighlight() {
+    grid.querySelectorAll('.pat-cell').forEach(c => {
+      c.style.outline = '';
+      c.style.outlineOffset = '';
+    });
+  }
+})();
+
+// ============ LIVE OUTPUT GRID ============
+let liveValues = {}; // {chanNum: value 0-1}
+let prevLiveValues = {};
+let liveVelocity = {}; // rate of change per ms
+let lastLivePoll = 0;
+let livePollInterval = 50; // ms between polls
+let outputCells = []; // cached DOM references
+
+function buildOutputGrid() {
+  let container = document.getElementById('pat-output-grid');
+  container.innerHTML = '';
+  container.style.gridTemplateColumns = 'repeat(' + mapCols + ', 1fr)';
+  outputCells = [];
+
+  for(let y = 0; y < mapRows; y++) {
+    for(let x = 0; x < mapCols; x++) {
+      let cell = document.createElement('div');
+      let key = x + ',' + y;
+      let ch = mapGrid[key];
+      cell.className = 'out-cell';
+      cell.dataset.ch = ch !== undefined && ch !== null ? ch : '';
+      if(ch !== undefined && ch !== null) {
+        cell.innerHTML = '<span style="font-size:8px;">Ch ' + ch + '</span><span class="out-val">0.00</span>';
+      } else {
+        cell.innerHTML = '<span style="color:#333;">--</span>';
+      }
+      container.appendChild(cell);
+      outputCells.push(cell);
+    }
+  }
+}
+
+function renderOutputGrid() { buildOutputGrid(); }
+
+function updateOutputCells() {
+  let now = performance.now();
+  let dt = now - lastLivePoll; // ms since last poll
+
+  outputCells.forEach(cell => {
+    let ch = cell.dataset.ch;
+    if(ch === '') return;
+    ch = parseInt(ch);
+    let cur = liveValues[ch] || 0;
+    let vel = liveVelocity[ch] || 0;
+    // Extrapolate from last known value using velocity
+    let val = Math.max(0, Math.min(1, cur + vel * dt));
+    let brightness = Math.round(val * 255);
+    let textColor = brightness > 128 ? '#000' : '#888';
+    cell.style.background = 'rgb(' + brightness + ',' + brightness + ',' + brightness + ')';
+    cell.style.color = textColor;
+    let valSpan = cell.querySelector('.out-val');
+    if(valSpan) valSpan.textContent = val.toFixed(2);
+  });
+}
+
+function animateOutput() {
+  if(currentTab === 'pattern-editor' || currentTab === 'mapping') {
+    updateOutputCells();
+  }
+  requestAnimationFrame(animateOutput);
+}
+
+function pollLiveValues() {
+  if(currentTab !== 'pattern-editor' && currentTab !== 'mapping') {
+    setTimeout(pollLiveValues, 200);
+    return;
+  }
+  let chans = new Set();
+  Object.values(mapGrid).forEach(ch => { if(ch !== undefined && ch !== null) chans.add(ch); });
+  if(chans.size === 0) { setTimeout(pollLiveValues, 200); return; }
+
+  let chanList = Array.from(chans).join(',');
+  let s = "n = dc.op('_1to0')\nresult = {}\n";
+  s += "for ch in [" + chanList + "]:\n";
+  s += "    cname = 'chan' + str(ch)\n";
+  s += "    v = n[cname].eval() if n[cname] is not None else 0\n";
+  s += "    result[ch] = round(v, 4)\n";
+  tdExec(s).then(d => {
+    if(d && d.data && d.data.result) {
+      let now = performance.now();
+      let elapsed = now - lastLivePoll;
+      if(elapsed > 0) {
+        let newVals = d.data.result;
+        for(let ch in newVals) {
+          let prev = liveValues[ch] || 0;
+          liveVelocity[ch] = (newVals[ch] - prev) / elapsed; // change per ms
+        }
+        prevLiveValues = Object.assign({}, liveValues);
+        liveValues = newVals;
+      }
+      lastLivePoll = now;
+    }
+    setTimeout(pollLiveValues, livePollInterval);
+  }).catch(() => { setTimeout(pollLiveValues, 500); });
+}
+
+// ============ PLAYHEADS ============
+function updatePlayheads() {
+  let frac = totalDur > 0 ? currentTime / totalDur : 0;
+
+  let ph1 = document.getElementById('cue-playhead');
+  if(ph1) ph1.style.transform = 'translateX(' + (frac * getLaneWidth('cue-tracks')) + 'px)';
+
+  let ph2 = document.getElementById('playhead');
+  if(ph2) ph2.style.transform = 'translateX(' + (frac * getLaneWidth('tracks')) + 'px)';
+
+  let cm = Math.floor(currentTime / 60);
+  let cs = (currentTime % 60).toFixed(1);
+  let tm = Math.floor(totalDur / 60);
+  let ts = Math.round(totalDur % 60);
+  document.getElementById('time-display').textContent = cm + ':' + (cs < 10 ? '0' : '') + cs + ' / ' + tm + ':' + (ts < 10 ? '0' : '') + ts;
+}
+
+function updateControls() {
+  document.getElementById('btn-run').classList.toggle('active', isRunning);
+  document.getElementById('btn-pause').classList.toggle('active', isPaused);
+}
+
+// ============ TABS ============
+function switchToTab(tabName) {
+  currentTab = tabName;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + tabName).classList.add('active');
+
+  // Sidebar visibility
+  document.getElementById('sidebar-cues').style.display = 'none';
+  document.getElementById('sidebar-patterns').style.display = 'none';
+  document.getElementById('sidebar-placed').style.display = 'none';
+  document.getElementById('sidebar-mapping').style.display = 'none';
+  if(tabName === 'pattern-editor' && editingCueIdx >= 0) {
+    document.getElementById('sidebar-patterns').style.display = 'block';
+  } else if(tabName === 'mapping') {
+    document.getElementById('sidebar-mapping').style.display = 'block';
+  } else {
+    document.getElementById('sidebar-cues').style.display = 'block';
+    document.getElementById('sidebar-placed').style.display = placedCues.length > 0 ? 'block' : 'none';
+  }
+  renderAll();
+}
+
+// ============ EVENT HANDLERS ============
+
+// Tabs
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    if(t.dataset.tab === 'pattern-editor' && editingCueIdx < 0) {
+      if(selectedCueIdx >= 0) {
+        editingCueIdx = selectedCueIdx;
+        selectedPatIdx = -1;
+      } else {
+        return; // No cue to edit
+      }
+    }
+    switchToTab(t.dataset.tab);
+  });
+});
+
+// Transport
+document.getElementById('btn-run').addEventListener('click', () => {
+  let wasRunning = isRunning;
+  if(!wasRunning) {
+    // Schedule servo triggers FIRST — don't wait for TD response
+    scheduleServoTriggers();
+  } else {
+    // Stopping — clear timers and stop sequences immediately
+    clearServoTimers();
+    _seqStop = true;
+    ecFetch('/stop_sequence');
+  }
+  let s = "dc.par.Run = not dc.par.Run\n";
+  s += "t=dc.op('timer1')\nif dc.par.Run and not t['running'].eval():\n    t.par.start.pulse()\nresult='ok'";
+  tdExec(s);
+});
+document.getElementById('btn-pause').addEventListener('click', () => {
+  let wasPaused = isPaused;
+  tdExec("dc.par.Pause = not dc.par.Pause\nresult='ok'").then(() => {
+    if(!wasPaused) {
+      // Pausing — clear scheduled timers
+      clearServoTimers();
+    }
+    // Unpausing — timers already fired or will be re-checked next play
+  });
+});
+document.getElementById('btn-reset').addEventListener('click', () => {
+  clearServoTimers();
+  _seqStop = true;
+  ecFetch('/stop_sequence');
+  let s = "dc.par.Run=False\ndc.par.Pause=False\n";
+  s += "dc.op('timer1').par.initialize.pulse()\nresult='ok'";
+  tdExec(s);
+});
+
+// Loop mode
+let loopOn = true;
+function toggleLoop() {
+  loopOn = !loopOn;
+  document.getElementById('btn-loop').classList.toggle('active', loopOn);
+  let cycle = loopOn ? 'True' : 'False';
+  let ondone = loopOn ? 'restart' : 'donothing';
+  let s = "t=dc.op('timer1')\n";
+  s += "t.par.cycle=" + cycle + "\nt.par.cyclelimit=False\nt.par.ondone='" + ondone + "'\nresult='ok'";
+  tdExec(s);
+}
+document.getElementById('btn-loop').addEventListener('click', toggleLoop);
+
+// Settings
+function updateDurFromMinSec() {
+  let m = parseInt(document.getElementById('durMin').value) || 0;
+  let s = parseInt(document.getElementById('durSec').value) || 0;
+  totalDur = m * 60 + s;
+  if(totalDur < 1) totalDur = 1;
+  document.getElementById('totalDur').value = totalDur;
+  savePlacedToTD(); renderAll();
+}
+function setDurMinSec(totalS) {
+  document.getElementById('durMin').value = Math.floor(totalS / 60);
+  document.getElementById('durSec').value = Math.round(totalS % 60);
+}
+document.getElementById('durMin').addEventListener('change', updateDurFromMinSec);
+document.getElementById('durSec').addEventListener('change', updateDurFromMinSec);
+document.getElementById('maxDeg').addEventListener('change', e => {
+  tdExec("dc.par.Maxdegrees = " + (parseFloat(e.target.value) || 180) + "\nresult='ok'");
+});
+document.getElementById('lagTime').addEventListener('change', e => {
+  tdExec("dc.par.Lagtime = " + (parseFloat(e.target.value) || 0.8) + "\nresult='ok'");
+});
+document.getElementById('firstChan').addEventListener('change', e => {
+  firstChan = parseInt(e.target.value) || 0;
+  tdExec("dc.par.Firstchan = " + firstChan + "\nresult='ok'");
+  renderAll();
+});
+document.getElementById('totalChans').addEventListener('change', e => {
+  totalChans = parseInt(e.target.value) || 50;
+  tdExec("dc.par.Totalchans = " + totalChans + "\nresult='ok'");
+  renderAll();
+});
+
+// Zoom
+document.getElementById('zoom-slider').addEventListener('input', e => {
+  zoom = parseFloat(e.target.value);
+  renderAll();
+});
+
+// Servo pattern properties
+document.getElementById('sp-start').addEventListener('change', () => {
+  if(editingCueIdx < 0 || selectedPatIdx < 0) return;
+  let p = cues[editingCueIdx].patterns[selectedPatIdx];
+  if(getPatType(p) !== 'servo') return;
+  p.start = parseFloat(document.getElementById('sp-start').value) || 0;
+  saveServoPattern(p);
+});
+
+['change','input'].forEach(evt => {
+  document.getElementById('sp-duration').addEventListener(evt, () => {
+    if(editingCueIdx < 0 || selectedPatIdx < 0) return;
+    let p = cues[editingCueIdx].patterns[selectedPatIdx];
+    if(getPatType(p) !== 'servo') return;
+    p.duration = parseFloat(document.getElementById('sp-duration').value) || 10;
+    saveServoPattern(p);
+  });
+});
+
+function updateCfgPanel(p) {
+  let mode = (p && p.seq_mode) || 'PV';
+  document.getElementById('cfg-pv').style.display = mode === 'PV' ? 'block' : 'none';
+  document.getElementById('cfg-pp').style.display = mode === 'PP' ? 'block' : 'none';
+  document.getElementById('cfg-csp').style.display = mode === 'CSP' ? 'block' : 'none';
+  if(!p) return;
+  let cfg = p.config || {};
+  if(mode === 'PV') {
+    document.getElementById('cfg-pv-vel').value = cfg.velocity || 80000;
+    document.getElementById('cfg-pv-accel').value = cfg.accel || 6000;
+    document.getElementById('cfg-pv-decel').value = cfg.decel || 6000;
+    document.getElementById('cfg-pv-steps').value = cfg.steps_per_meter || 792914;
+    document.getElementById('cfg-pv-rawsteps').value = cfg.raw_steps_per_meter || 202985985;
+  } else if(mode === 'PP') {
+    document.getElementById('cfg-pp-vel').value = cfg.velocity || 80000;
+    document.getElementById('cfg-pp-accel').value = cfg.accel || 6000;
+    document.getElementById('cfg-pp-decel').value = cfg.decel || 6000;
+    document.getElementById('cfg-pp-steps').value = cfg.steps_per_meter || 792914;
+    document.getElementById('cfg-pp-rawsteps').value = cfg.raw_steps_per_meter || 202985985;
+  } else {
+    document.getElementById('cfg-csp-vel').value = cfg.csp_velocity || 100;
+    document.getElementById('cfg-csp-steps').value = cfg.steps_per_meter || 792914;
+    document.getElementById('cfg-csp-rawsteps').value = cfg.raw_steps_per_meter || 202985985;
+  }
+}
+
+function saveCfgToPattern(p) {
+  if(!p) return;
+  let mode = p.seq_mode || 'CSP';
+  if(!p.config) p.config = {};
+  if(mode === 'PV') {
+    p.config.velocity = parseInt(document.getElementById('cfg-pv-vel').value) || 80000;
+    p.config.accel = parseInt(document.getElementById('cfg-pv-accel').value) || 6000;
+    p.config.decel = parseInt(document.getElementById('cfg-pv-decel').value) || 6000;
+    p.config.steps_per_meter = parseInt(document.getElementById('cfg-pv-steps').value) || 792914;
+    p.config.raw_steps_per_meter = parseInt(document.getElementById('cfg-pv-rawsteps').value) || 202985985;
+  } else if(mode === 'PP') {
+    p.config.velocity = parseInt(document.getElementById('cfg-pp-vel').value) || 80000;
+    p.config.accel = parseInt(document.getElementById('cfg-pp-accel').value) || 6000;
+    p.config.decel = parseInt(document.getElementById('cfg-pp-decel').value) || 6000;
+    p.config.steps_per_meter = parseInt(document.getElementById('cfg-pp-steps').value) || 792914;
+    p.config.raw_steps_per_meter = parseInt(document.getElementById('cfg-pp-rawsteps').value) || 202985985;
+  } else {
+    p.config.csp_velocity = parseInt(document.getElementById('cfg-csp-vel').value) || 100;
+    p.config.steps_per_meter = parseInt(document.getElementById('cfg-csp-steps').value) || 792914;
+    p.config.raw_steps_per_meter = parseInt(document.getElementById('cfg-csp-rawsteps').value) || 202985985;
+  }
+  // Sync hidden fields for connect
+  document.getElementById('ec-velocity').value = p.config.velocity || 80000;
+  document.getElementById('ec-accel').value = p.config.accel || 6000;
+  document.getElementById('ec-decel').value = p.config.decel || 6000;
+  document.getElementById('ec-csp-vel').value = p.config.csp_velocity || 100;
+  document.getElementById('ec-steps').value = p.config.steps_per_meter || 792914;
+  document.getElementById('ec-raw-steps').value = p.config.raw_steps_per_meter || 202985985;
+  saveCuesToTD(); savePlacedToTD();
+}
+
+// Config field change listeners
+['cfg-pv-vel','cfg-pv-accel','cfg-pv-decel','cfg-pv-steps','cfg-pv-rawsteps',
+ 'cfg-pp-vel','cfg-pp-accel','cfg-pp-decel','cfg-pp-steps','cfg-pp-rawsteps',
+ 'cfg-csp-vel','cfg-csp-steps','cfg-csp-rawsteps'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    if(editingCueIdx < 0 || selectedPatIdx < 0) return;
+    let p = cues[editingCueIdx].patterns[selectedPatIdx];
+    if(getPatType(p) !== 'servo') return;
+    saveCfgToPattern(p);
+  });
+});
+
+document.getElementById('sp-seq-mode').addEventListener('change', () => {
+  if(editingCueIdx < 0 || selectedPatIdx < 0) return;
+  let p = cues[editingCueIdx].patterns[selectedPatIdx];
+  if(getPatType(p) !== 'servo') return;
+  p.seq_mode = document.getElementById('sp-seq-mode').value;
+  document.getElementById('ec-mode').value = p.seq_mode;
+  ecUpdateModeUI();
+  updateCfgPanel(p);
+  p.steps = [];
+  saveServoPattern(p);
+  renderServoSteps(p);
+});
+
+document.getElementById('sp-loop-mode').addEventListener('change', () => {
+  if(editingCueIdx < 0 || selectedPatIdx < 0) return;
+  let p = cues[editingCueIdx].patterns[selectedPatIdx];
+  if(getPatType(p) !== 'servo') return;
+  p.loop_mode = document.getElementById('sp-loop-mode').value;
+  document.getElementById('sp-loop-count').style.display = (p.loop_mode === 'count') ? 'inline-block' : 'none';
+  saveServoPattern(p);
+});
+
+document.getElementById('sp-loop-count').addEventListener('change', () => {
+  if(editingCueIdx < 0 || selectedPatIdx < 0) return;
+  let p = cues[editingCueIdx].patterns[selectedPatIdx];
+  if(getPatType(p) !== 'servo') return;
+  p.loop_count = parseInt(document.getElementById('sp-loop-count').value) || 1;
+  saveServoPattern(p);
+});
+
+document.getElementById('sp-add-step').addEventListener('click', () => {
+  if(editingCueIdx < 0 || selectedPatIdx < 0) return;
+  let p = cues[editingCueIdx].patterns[selectedPatIdx];
+  if(getPatType(p) !== 'servo') return;
+  if(!p.steps) p.steps = [];
+  let mode = p.seq_mode || 'CSP';
+  if(mode === 'PV') {
+    p.steps.push({slave: 'all', action: 'forward', speed: 80000, duration: 2.0});
+  } else if(mode === 'PP') {
+    p.steps.push({positions: '0.0', velocity: 80000, accel: 6000, decel: 6000, hold: 1.0});
+  } else {
+    p.steps.push({pos_s: '0.0', pos_m: '0.0', pos_e: '0.0', csp_velocity: 100, hold: 1.0});
+  }
+  saveServoPattern(p);
+  renderServoSteps(p);
+});
+
+// --- PV Sequence Runner (client-side, directly calls velocity endpoints) ---
+let _seqRunning = false;
+let _seqStop = false;
+
+async function _runPvSequence(steps, loopCount, loopForever) {
+  _seqRunning = true;
+  _seqStop = false;
+  console.log('PV Sequence:', JSON.stringify({steps, loopCount, loopForever}));
+  document.getElementById('ec-conn-status').textContent = 'Sequence running (' + steps.length + ' steps, ' + loopCount + 'x)...';
+  try {
+    let iteration = 0;
+    while (true) {
+      if (!loopForever && iteration >= loopCount) break;
+      for (let si = 0; si < steps.length; si++) {
+        if (_seqStop) { _seqRunning = false; return; }
+        let s = steps[si];
+        let slave = s.slave != null ? String(s.slave) : 'all';
+        let action = s.action || 'forward';
+        let speed = s.speed || 80000;
+        let duration = s.duration || 2;
+        console.log('  Step ' + (si+1) + ': slave=' + slave + ' ' + action + ' speed=' + speed + ' dur=' + duration + 's raw:', JSON.stringify(s));
+        // Start action
+        let endpoint = action === 'forward' ? '/velocity_forward' : action === 'backward' ? '/velocity_backward' : '/velocity_stop';
+        if (slave === 'all') {
+          for (let i = 0; i < ecSlaves; i++) await ecFetch(endpoint, {slave: i, speed: speed});
+        } else {
+          await ecFetch(endpoint, {slave: parseInt(slave), speed: speed});
+        }
+        // Wait duration
+        let elapsed = 0;
+        while (elapsed < duration * 1000) {
+          if (_seqStop) {
+            // Stop the slaves we started
+            if (slave === 'all') { for (let i = 0; i < ecSlaves; i++) ecFetch('/velocity_stop', {slave: i}); }
+            else ecFetch('/velocity_stop', {slave: parseInt(slave)});
+            _seqRunning = false; return;
+          }
+          await new Promise(r => setTimeout(r, 100));
+          elapsed += 100;
+        }
+        // Stop after duration
+        if (slave === 'all') {
+          for (let i = 0; i < ecSlaves; i++) await ecFetch('/velocity_stop', {slave: i});
+        } else {
+          await ecFetch('/velocity_stop', {slave: parseInt(slave)});
+        }
+      }
+      iteration++;
+    }
+  } catch(e) { console.error('Sequence error:', e); }
+  _seqRunning = false;
+  document.getElementById('ec-conn-status').textContent = 'Sequence complete';
+}
+
+document.getElementById('sp-test-sequence').addEventListener('click', async () => {
+  if(editingCueIdx < 0 || selectedPatIdx < 0) return;
+  let p = cues[editingCueIdx].patterns[selectedPatIdx];
+  if(getPatType(p) !== 'servo' || !p.steps || p.steps.length === 0) return;
+  if(!ecConnected) { alert('Connect first'); return; }
+  // Clear any stale running state first
+  if(_seqRunning) { _seqStop = true; _seqRunning = false; }
+  await ecFetch('/stop_sequence');
+  let seqMode = p.seq_mode || 'CSP';
+  if(seqMode === 'PV') {
+    _runPvSequence(p.steps, p.loop_mode === 'count' ? (p.loop_count || 1) : 1, p.loop_mode === 'forever');
+  } else {
+    // PP/CSP: use server-side run_sequence
+    let steps = p.steps.map(s => {
+      if(seqMode === 'PP') {
+        let posObj = {};
+        (s.positions||'0').split(',').forEach((v,i) => { posObj[String(i)] = parseFloat(v.trim()) || 0; });
+        return { positions: posObj, velocity: s.velocity, accel: s.accel, decel: s.decel, hold: s.hold };
+      } else {
+        let posS = {}, posM = {}, posE = {};
+        (s.pos_s||s.positions||'0').split(',').forEach((v,i) => { posS[String(i)] = parseFloat(v.trim()) || 0; });
+        (s.pos_m||'0').split(',').forEach((v,i) => { posM[String(i)] = parseFloat(v.trim()) || 0; });
+        (s.pos_e||'0').split(',').forEach((v,i) => { posE[String(i)] = parseFloat(v.trim()) || 0; });
+        return { pos_s: posS, pos_m: posM, pos_e: posE, csp_velocity: s.csp_velocity || 100, hold: s.hold, slave: s.slave != null ? String(s.slave) : 'all' };
+      }
+    });
+    let loopForever = p.loop_mode === 'forever';
+    let loopCount = p.loop_mode === 'count' ? (p.loop_count || 1) : 1;
+    console.log('CSP/PP steps to server:', JSON.stringify(steps, null, 2));
+    ecFetch('/run_sequence', { steps: steps, loop_count: loopCount, loop_forever: loopForever, mode: seqMode }).then(d => {
+      if(d.error) alert(d.error);
+      else document.getElementById('ec-conn-status').textContent = d.message || 'Sequence started';
+    });
+  }
+});
+
+document.getElementById('sp-stop-sequence').addEventListener('click', () => {
+  _seqStop = true;
+  // Also stop server-side sequence and all motors
+  ecFetch('/stop_sequence').then(d => {
+    document.getElementById('ec-conn-status').textContent = 'Stopped';
+  });
+  // Stop all slaves directly
+  for(let i = 0; i < ecSlaves; i++) ecFetch('/velocity_stop', {slave: i});
+});
+
+function saveServoPattern(p) {
+  // Recalculate duration from steps
+  let dur = getPatDur(p);
+  p.duration = dur;
+  p.ramp_up = dur;
+  p.hold_high = 0; p.ramp_down = 0; p.hold_low = 0;
+  p.num_chans = 1; p.delay_ms = 0;
+  saveCuesToTD(); savePlacedToTD();
+  renderAll();
+}
+
+function renderServoSteps(p) {
+  let list = document.getElementById('sp-steps-list');
+  list.innerHTML = '';
+  if(!p.steps) return;
+  let mode = p.seq_mode || 'CSP';
+  p.steps.forEach((s, i) => {
+    let div = document.createElement('div');
+    div.style.cssText = 'background:#0a0a1a;border:1px solid #333;border-radius:4px;padding:6px;margin:3px 0;position:relative;';
+    let fieldsHtml = '';
+    if(mode === 'PV') {
+      let slaveOpts = '<option value="all"' + ((s.slave===undefined||s.slave==='all')?' selected':'') + '>All Slaves</option>';
+      for(let si=0; si<Math.max(ecSlaves,2); si++) slaveOpts += '<option value="'+si+'"' + (String(s.slave)===String(si)?' selected':'') + '>Slave '+si+'</option>';
+      fieldsHtml = `
+        <div style="color:#4ecca3;font-size:9px;font-weight:bold;margin:2px 0;letter-spacing:1px;">ACTION</div>
+        <div class="prop-row"><label style="width:60px;">Slave</label>
+          <select class="sp-s-slave" style="flex:1;background:#0a0a1a;border:1px solid #333;color:#e0e0e0;padding:3px 6px;border-radius:3px;font-size:11px;">${slaveOpts}</select>
+        </div>
+        <div class="prop-row"><label style="width:60px;">Dir</label>
+          <select class="sp-s-action" style="flex:1;background:#0a0a1a;border:1px solid #333;color:#e0e0e0;padding:3px 6px;border-radius:3px;font-size:11px;">
+            <option value="forward" ${(s.action||'forward')==='forward'?'selected':''}>Forward</option>
+            <option value="backward" ${(s.action||'forward')==='backward'?'selected':''}>Backward</option>
+            <option value="stop" ${(s.action||'forward')==='stop'?'selected':''}>Stop</option>
+          </select>
+        </div>
+        <div class="prop-row"><label style="width:60px;">Speed</label><input type="number" class="sp-s-speed" value="${s.speed||80000}" step="1000" min="0" style="flex:1;"></div>
+        <div class="prop-row"><label style="width:60px;">Dur (s)</label><input type="number" class="sp-s-dur" value="${s.duration||2}" step="0.1" min="0" style="flex:1;"></div>`;
+    } else if(mode === 'PP') {
+      let slaveOpts2 = '<option value="all"' + ((s.slave===undefined||s.slave==='all')?' selected':'') + '>All Slaves</option>';
+      for(let si=0; si<Math.max(ecSlaves,2); si++) slaveOpts2 += '<option value="'+si+'"' + (String(s.slave)===String(si)?' selected':'') + '>Slave '+si+'</option>';
+      fieldsHtml = `
+        <div class="prop-row"><label style="width:60px;">Slave</label>
+          <select class="sp-s-slave" style="flex:1;background:#0a0a1a;border:1px solid #333;color:#e0e0e0;padding:3px 6px;border-radius:3px;font-size:11px;">${slaveOpts2}</select>
+        </div>
+        <div class="prop-row"><label style="width:60px;">Pos (m)</label><input type="text" class="sp-s-pos" value="${s.positions||'0.0'}" placeholder="0.5, -0.5" style="flex:1;"></div>
+        <div class="prop-row"><label style="width:60px;">Vel</label><input type="number" class="sp-s-vel" value="${s.velocity||80000}" step="1000" min="0" style="flex:1;"></div>
+        <div style="display:flex;gap:4px;">
+          <div class="prop-row" style="flex:1;"><label style="width:30px;">Acc</label><input type="number" class="sp-s-acc" value="${s.accel||6000}" step="500" min="0"></div>
+          <div class="prop-row" style="flex:1;"><label style="width:30px;">Dec</label><input type="number" class="sp-s-dec" value="${s.decel||6000}" step="500" min="0"></div>
+        </div>
+        <div class="prop-row"><label style="width:60px;">Hold (s)</label><input type="number" class="sp-s-hold" value="${s.hold||0}" step="0.1" min="0" style="flex:1;"></div>`;
+    } else {
+      let slaveOpts3 = '<option value="all"' + ((s.slave===undefined||s.slave==='all')?' selected':'') + '>All Slaves</option>';
+      for(let si=0; si<Math.max(ecSlaves,2); si++) slaveOpts3 += '<option value="'+si+'"' + (String(s.slave)===String(si)?' selected':'') + '>Slave '+si+'</option>';
+      fieldsHtml = `
+        <div class="prop-row"><label style="width:60px;">Slave</label>
+          <select class="sp-s-slave" style="flex:1;background:#0a0a1a;border:1px solid #333;color:#e0e0e0;padding:3px 6px;border-radius:3px;font-size:11px;">${slaveOpts3}</select>
+        </div>
+        <div class="prop-row"><label style="width:60px;color:#4ecca3;">S (m)</label><input type="text" class="sp-s-pos-s" value="${s.pos_s||s.positions||'0.0'}" placeholder="0.0" style="flex:1;"></div>
+        <div class="prop-row"><label style="width:60px;color:#f1c40f;">M (m)</label><input type="text" class="sp-s-pos-m" value="${s.pos_m||'0.0'}" placeholder="0.5" style="flex:1;"></div>
+        <div class="prop-row"><label style="width:60px;color:#e94560;">E (m)</label><input type="text" class="sp-s-pos-e" value="${s.pos_e||'0.0'}" placeholder="0.0" style="flex:1;"></div>
+        <div class="prop-row"><label style="width:60px;">CSP Vel</label><input type="number" class="sp-s-cspvel" value="${s.csp_velocity||100}" step="10" min="1" style="flex:1;"></div>
+        <div class="prop-row"><label style="width:60px;">Hold (s)</label><input type="number" class="sp-s-hold" value="${s.hold||0}" step="0.1" min="0" style="flex:1;"></div>`;
+    }
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <span style="color:#f1c40f;font-weight:bold;font-size:10px;">Step ${i+1}</span>
+        <button class="del-btn" style="font-size:12px;color:#e94560;background:none;border:none;cursor:pointer;">x</button>
+      </div>${fieldsHtml}`;
+    list.appendChild(div);
+
+    // Delete step
+    div.querySelector('.del-btn').addEventListener('click', () => {
+      p.steps.splice(i, 1);
+      saveServoPattern(p);
+      renderServoSteps(p);
+    });
+
+    // Mode-specific field change handlers
+    if(mode === 'PV') {
+      div.querySelector('.sp-s-slave').addEventListener('change', e => { p.steps[i].slave = e.target.value; saveServoPattern(p); });
+      div.querySelector('.sp-s-action').addEventListener('change', e => { p.steps[i].action = e.target.value; saveServoPattern(p); });
+      div.querySelector('.sp-s-speed').addEventListener('change', e => { p.steps[i].speed = parseInt(e.target.value) || 80000; saveServoPattern(p); });
+      div.querySelector('.sp-s-dur').addEventListener('change', e => { p.steps[i].duration = parseFloat(e.target.value) || 2; saveServoPattern(p); });
+    } else if(mode === 'PP') {
+      div.querySelector('.sp-s-slave').addEventListener('change', e => { p.steps[i].slave = e.target.value; saveServoPattern(p); });
+      div.querySelector('.sp-s-pos').addEventListener('change', e => { p.steps[i].positions = e.target.value; saveServoPattern(p); });
+      div.querySelector('.sp-s-vel').addEventListener('change', e => { p.steps[i].velocity = parseInt(e.target.value) || 80000; saveServoPattern(p); });
+      div.querySelector('.sp-s-acc').addEventListener('change', e => { p.steps[i].accel = parseInt(e.target.value) || 6000; saveServoPattern(p); });
+      div.querySelector('.sp-s-dec').addEventListener('change', e => { p.steps[i].decel = parseInt(e.target.value) || 6000; saveServoPattern(p); });
+      div.querySelector('.sp-s-hold').addEventListener('change', e => { p.steps[i].hold = parseFloat(e.target.value) || 0; saveServoPattern(p); });
+    } else {
+      div.querySelector('.sp-s-slave').addEventListener('change', e => { p.steps[i].slave = e.target.value; saveServoPattern(p); });
+      div.querySelector('.sp-s-pos-s').addEventListener('change', e => { p.steps[i].pos_s = e.target.value; saveServoPattern(p); });
+      div.querySelector('.sp-s-pos-m').addEventListener('change', e => { p.steps[i].pos_m = e.target.value; saveServoPattern(p); });
+      div.querySelector('.sp-s-pos-e').addEventListener('change', e => { p.steps[i].pos_e = e.target.value; saveServoPattern(p); });
+      div.querySelector('.sp-s-cspvel').addEventListener('change', e => { p.steps[i].csp_velocity = parseInt(e.target.value) || 100; saveServoPattern(p); });
+      div.querySelector('.sp-s-hold').addEventListener('change', e => { p.steps[i].hold = parseFloat(e.target.value) || 0; saveServoPattern(p); });
+    }
+  });
+}
+
+// ============ ETHERCAT API (external ec_server on port 9982) ============
+const EC_API = "http://localhost:9982";
+
+function ecLog(msg, type) {
+  let el = document.getElementById('ec-log');
+  if(!el) return;
+  let ts = new Date().toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  let color = type === 'error' ? '#e94560' : type === 'ok' ? '#4ecca3' : type === 'warn' ? '#f1c40f' : '#8f8';
+  el.innerHTML += '<span style="color:#666;">[' + ts + ']</span> <span style="color:' + color + ';">' + msg + '</span>\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+document.getElementById('ec-log-clear').addEventListener('click', () => {
+  document.getElementById('ec-log').innerHTML = '';
+  _lastLogIdx = 0;
+});
+
+// Poll server logs and show in log terminal
+let _lastLogIdx = 0;
+let _logPollTimer = null;
+function pollServerLogs() {
+  fetch(EC_API + '/logs').then(r => r.json()).then(d => {
+    if(d.logs && d.logs.length > _lastLogIdx) {
+      d.logs.slice(_lastLogIdx).forEach(msg => ecLog('[srv] ' + msg));
+      _lastLogIdx = d.logs.length;
+    }
+  }).catch(() => {});
+}
+_logPollTimer = setInterval(pollServerLogs, 1000);
+
+function ecFetch(endpoint, body) {
+  let opts = body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : {};
+  ecLog('→ ' + endpoint, 'warn');
+  return fetch(EC_API + endpoint, opts).then(r => r.json()).then(d => {
+    if(d.error) ecLog('✗ ' + d.error, 'error');
+    else if(d.message) ecLog('✓ ' + d.message, 'ok');
+    else if(d.success === true) ecLog('✓ OK', 'ok');
+    else if(d.success === false) ecLog('✗ ' + JSON.stringify(d), 'error');
+    return d;
+  }).catch(e => {
+    ecLog('✗ EC server not running', 'error');
+    return {error: 'EC server not running. Start ec_server.py first.'};
+  });
+}
+
+function ecScanAdapters() {
+  ecFetch('/adapters').then(d => {
+    if(!d || !d.adapters) { alert(d.error || 'EC server not running'); return; }
+    let sel = document.getElementById('ec-adapter');
+    sel.innerHTML = '<option value="">-- Select Adapter --</option>';
+    d.adapters.forEach(a => {
+      let opt = document.createElement('option');
+      opt.value = a.name;
+      opt.textContent = (a.desc || a.name) + ' [' + a.name.slice(-5,-1) + ']';
+      sel.appendChild(opt);
+    });
+    // Enable connect button after scan
+    document.getElementById('ec-btn-connect').disabled = false;
+  });
+}
+
+function ecConnect() {
+  let adapter = document.getElementById('ec-adapter').value;
+  if(!adapter) { alert('Select an adapter first'); return; }
+
+  document.getElementById('ec-conn-status').textContent = 'Connecting... (this takes ~10s)';
+  document.getElementById('ec-conn-status').style.color = '#f1c40f';
+  document.getElementById('ec-btn-connect').disabled = true;
+
+  console.log('ecConnect: adapter=' + adapter);
+
+  ecFetch('/connect', {
+    adapter: adapter,
+    mode: document.getElementById('ec-mode').value,
+    velocity: parseInt(document.getElementById('ec-velocity').value) || 80000,
+    accel: parseInt(document.getElementById('ec-accel').value) || 6000,
+    decel: parseInt(document.getElementById('ec-decel').value) || 6000,
+    csp_velocity: parseInt(document.getElementById('ec-csp-vel').value) || 100,
+    steps_per_meter: parseInt(document.getElementById('ec-steps').value) || 792914,
+    raw_steps_per_meter: parseInt(document.getElementById('ec-raw-steps').value) || 202985985
+  }).then(d => {
+    if(d.error) {
+      document.getElementById('ec-conn-status').textContent = 'Error: ' + d.error;
+      document.getElementById('ec-conn-status').style.color = '#e94560';
+      return;
+    }
+    if(d.success) {
+      ecConnected = true;
+      ecSlaves = d.slaves;
+      document.getElementById('ec-conn-status').textContent = 'Connected: ' + d.slaves + ' slave(s) [' + d.mode + ']';
+      document.getElementById('ec-conn-status').style.color = '#4ecca3';
+      updateEcButtons();
+      startEcPolling();
+      renderEcMoveControls();
+    } else {
+      document.getElementById('ec-conn-status').textContent = 'Error: ' + (d.error || 'Connection failed');
+      document.getElementById('ec-conn-status').style.color = '#e94560';
+    }
+  });
+}
+
+function ecDisconnect() {
+  ecFetch('/disconnect', {}).then(() => {
+    ecConnected = false;
+    ecSlaves = 0;
+    stopEcPolling();
+    document.getElementById('ec-conn-status').textContent = 'Disconnected';
+    document.getElementById('ec-conn-status').style.color = '#888';
+    document.getElementById('ec-slaves-list').innerHTML = '<div style="color:#555;font-size:10px;">No slaves connected</div>';
+    document.getElementById('ec-move-controls').innerHTML = '';
+    updateEcButtons();
+  });
+}
+
+function ecPollStatus() {
+  if(!ecConnected) return;
+  ecFetch('/status').then(d => {
+    if(!d || d.error) return;
+    ecConnected = d.connected;
+    if(!d.connected) {
+      document.getElementById('ec-conn-status').textContent = 'Connection lost';
+      document.getElementById('ec-conn-status').style.color = '#e94560';
+      updateEcButtons();
+      return;
+    }
+    let list = document.getElementById('ec-slaves-list');
+    list.innerHTML = '';
+    (d.slaves || []).forEach(s => {
+      let row = document.createElement('div');
+      row.className = 'ec-slave-row';
+      let dotClass = s.fault ? 'fault' : (s.enabled ? 'ok' : 'off');
+      let status = s.fault ? ('FAULT: ' + (s.error_name || '')) : (s.enabled ? 'Enabled' : 'Disabled');
+      row.innerHTML = '<span class="ec-dot ' + dotClass + '"></span>' +
+        '<span style="flex:1;">Slave ' + s.index + '</span>' +
+        '<span style="color:#4ecca3;">' + s.position_m.toFixed(4) + 'm</span>' +
+        '<span style="color:#888;margin-left:6px;">' + status + '</span>';
+      list.appendChild(row);
+    });
+    ecSlaves = (d.slaves || []).length;
+    updateEcButtons();
+  });
+}
+
+function startEcPolling() {
+  if(ecPollTimer) return;
+  ecPollTimer = setInterval(ecPollStatus, 500);
+}
+function stopEcPolling() {
+  if(ecPollTimer) { clearInterval(ecPollTimer); ecPollTimer = null; }
+}
+
+function updateEcButtons() {
+  // No disabled attributes - all buttons always clickable, handlers check ecConnected
+}
+
+function ecUpdateModeUI() {
+  let mode = document.getElementById('ec-mode').value;
+  let posCtrl = document.getElementById('ec-position-controls');
+  let velCtrl = document.getElementById('ec-velocity-controls');
+  let cspCalc = document.getElementById('ec-csp-calc');
+  let posCalc = document.getElementById('ec-pos-calc');
+  if(posCtrl) posCtrl.style.display = (mode === 'PV') ? 'none' : 'block';
+  if(velCtrl) velCtrl.style.display = (mode === 'PV') ? 'block' : 'none';
+  if(cspCalc) cspCalc.style.display = (mode === 'CSP') ? 'block' : 'none';
+  if(posCalc) posCalc.style.display = (mode === 'CSP') ? 'block' : 'none';
+}
+
+function renderEcMoveControls() {
+  let selMove = document.getElementById('ec-move-slave');
+  let selVel = document.getElementById('ec-vel-slave');
+  selMove.innerHTML = '<option value="all">All Slaves</option>';
+  selVel.innerHTML = '<option value="all">All Slaves</option>';
+  for(let i = 0; i < ecSlaves; i++) {
+    selMove.innerHTML += '<option value="' + i + '">Slave ' + i + '</option>';
+    selVel.innerHTML += '<option value="' + i + '">Slave ' + i + '</option>';
+  }
+  let container = document.getElementById('ec-move-controls');
+  container.innerHTML = '';
+  for(let i = 0; i < ecSlaves; i++) {
+    let row = document.createElement('div');
+    row.className = 'ec-move-row';
+    row.innerHTML = '<label>Slave ' + i + '</label><input id="ec-pos-' + i + '" type="number" step="0.01" value="0.0" placeholder="meters"><span style="color:#666;font-size:10px;">m</span>';
+    container.appendChild(row);
+  }
+}
+
+function ecQuickMove(pos) {
+  if(!ecConnected) { alert('Connect first'); return; }
+  let sel = document.getElementById('ec-move-slave').value;
+  if(sel === 'all') {
+    let positions = {};
+    for(let i = 0; i < ecSlaves; i++) positions[String(i)] = pos;
+    ecFetch('/move_all', {positions: positions});
+  } else {
+    ecFetch('/move', {slave: parseInt(sel), position: pos});
+  }
+}
+
+// Mode switch
+document.getElementById('ec-mode').addEventListener('change', ecUpdateModeUI);
+ecUpdateModeUI();
+
+// EtherCAT button handlers
+document.getElementById('ec-btn-scan').addEventListener('click', ecScanAdapters);
+document.getElementById('ec-btn-connect').addEventListener('click', ecConnect);
+document.getElementById('ec-btn-disconnect').addEventListener('click', ecDisconnect);
+document.getElementById('ec-btn-enable').addEventListener('click', () => { if(!ecConnected) { alert('Connect first'); return; } ecFetch('/enable_all', {}); });
+document.getElementById('ec-btn-disable').addEventListener('click', () => { if(!ecConnected) return; ecFetch('/disable_all', {}); });
+document.getElementById('ec-btn-reset').addEventListener('click', () => { if(!ecConnected) return; ecFetch('/reset_all_faults', {}); });
+document.getElementById('ec-btn-home').addEventListener('click', () => { if(!ecConnected) return; ecFetch('/home', {}); });
+document.getElementById('ec-btn-set-home').addEventListener('click', () => { if(!ecConnected) return; ecFetch('/set_home_all', {}); });
+document.getElementById('ec-btn-stop').addEventListener('click', () => ecFetch('/stop', {}));
+
+// Position move
+document.getElementById('ec-btn-move').addEventListener('click', () => {
+  if(!ecConnected) { alert('Connect first'); return; }
+  let sel = document.getElementById('ec-move-slave').value;
+  let target = parseFloat(document.getElementById('ec-move-target').value) || 0;
+  if(sel === 'all') {
+    let positions = {};
+    for(let i = 0; i < ecSlaves; i++) positions[String(i)] = target;
+    ecFetch('/move_all', {positions: positions});
+  } else {
+    ecFetch('/move', {slave: parseInt(sel), position: target});
+  }
+});
+document.getElementById('ec-btn-move-home').addEventListener('click', () => { if(!ecConnected) return; ecFetch('/home', {}); });
+document.getElementById('ec-btn-move-all').addEventListener('click', () => {
+  if(!ecConnected) return;
+  let positions = {};
+  for(let i = 0; i < ecSlaves; i++) {
+    let el = document.getElementById('ec-pos-' + i);
+    if(el) positions[String(i)] = parseFloat(el.value) || 0;
+  }
+  ecFetch('/move_all', {positions: positions});
+});
+
+// PV velocity controls
+document.getElementById('ec-btn-forward').addEventListener('click', () => {
+  if(!ecConnected) { alert('Connect first'); return; }
+  let sel = document.getElementById('ec-vel-slave').value;
+  let speed = (parseInt(document.getElementById('ec-pv-speed').value) || 50) * 1000;
+  if(sel === 'all') {
+    for(let i = 0; i < ecSlaves; i++) ecFetch('/velocity_forward', {slave:i, speed:speed});
+  } else {
+    ecFetch('/velocity_forward', {slave:parseInt(sel), speed:speed});
+  }
+});
+document.getElementById('ec-btn-backward').addEventListener('click', () => {
+  if(!ecConnected) { alert('Connect first'); return; }
+  let sel = document.getElementById('ec-vel-slave').value;
+  let speed = (parseInt(document.getElementById('ec-pv-speed').value) || 50) * 1000;
+  if(sel === 'all') {
+    for(let i = 0; i < ecSlaves; i++) ecFetch('/velocity_backward', {slave:i, speed:speed});
+  } else {
+    ecFetch('/velocity_backward', {slave:parseInt(sel), speed:speed});
+  }
+});
+document.getElementById('ec-btn-vel-stop').addEventListener('click', () => {
+  if(!ecConnected) return;
+  let sel = document.getElementById('ec-vel-slave').value;
+  if(sel === 'all') {
+    for(let i = 0; i < ecSlaves; i++) ecFetch('/velocity_stop', {slave:i});
+  } else {
+    ecFetch('/velocity_stop', {slave:parseInt(sel)});
+  }
+});
+
+// CSP Speed Calculator
+function calcCspSpeed() {
+  let dist = parseFloat(document.getElementById('calc-dist').value) || 1;
+  let dur = parseFloat(document.getElementById('calc-dur').value) || 10;
+  let stepsPerMeter = parseInt(document.getElementById('ec-steps').value) || 792914;
+  let totalSteps = dist * stepsPerMeter;
+  let totalMs = dur * 1000;
+  let vel = Math.max(1, Math.round(totalSteps / totalMs));
+  document.getElementById('calc-result').textContent = vel.toLocaleString();
+  document.getElementById('calc-steps-ref').textContent = stepsPerMeter.toLocaleString();
+  return vel;
+}
+document.getElementById('calc-dist').addEventListener('input', calcCspSpeed);
+document.getElementById('calc-dur').addEventListener('input', calcCspSpeed);
+document.getElementById('calc-apply').addEventListener('click', () => {
+  if(!ecConnected) { alert('Connect first'); return; }
+  let vel = calcCspSpeed();
+  document.getElementById('ec-csp-vel').value = vel;
+  for(let i = 0; i < ecSlaves; i++) ecFetch('/set_csp_velocity', {slave:i, velocity:vel});
+  ecLog('CSP velocity set to ' + vel + ' units/ms', 'ok');
+});
+document.getElementById('calc-apply-step').addEventListener('click', () => {
+  if(editingCueIdx < 0 || selectedPatIdx < 0) { alert('Select a CSP pattern first'); return; }
+  let p = cues[editingCueIdx].patterns[selectedPatIdx];
+  if(getPatType(p) !== 'servo' || (p.seq_mode || 'CSP') !== 'CSP') { alert('Select a CSP pattern'); return; }
+  if(!p.steps || p.steps.length === 0) { alert('Add a step first'); return; }
+  let vel = calcCspSpeed();
+  let lastStep = p.steps[p.steps.length - 1];
+  lastStep.csp_velocity = vel;
+  saveServoPattern(p);
+  renderServoSteps(p);
+  ecLog('CSP velocity ' + vel + ' applied to step ' + p.steps.length, 'ok');
+});
+calcCspSpeed();
+
+// Position Calculator: Position = (Speed × Time × 1000) / steps_per_meter
+function calcPosition() {
+  let speed = parseFloat(document.getElementById('calc-pos-speed').value) || 79;
+  let t = parseFloat(document.getElementById('calc-pos-time').value) || 0;
+  let stepsPerMeter = parseInt(document.getElementById('ec-steps').value) || 792914;
+  let pos = (speed * t * 1000) / stepsPerMeter;
+  document.getElementById('calc-pos-result').textContent = pos.toFixed(4);
+  return pos;
+}
+document.getElementById('calc-pos-speed').addEventListener('input', calcPosition);
+document.getElementById('calc-pos-time').addEventListener('input', calcPosition);
+function _applyPosToStep(field) {
+  if(editingCueIdx < 0 || selectedPatIdx < 0) { alert('Select a CSP pattern first'); return; }
+  let p = cues[editingCueIdx].patterns[selectedPatIdx];
+  if(getPatType(p) !== 'servo' || (p.seq_mode || 'CSP') !== 'CSP') { alert('Select a CSP pattern'); return; }
+  if(!p.steps || p.steps.length === 0) { alert('Add a step first'); return; }
+  let pos = calcPosition().toFixed(4);
+  let lastStep = p.steps[p.steps.length - 1];
+  lastStep[field] = pos;
+  saveServoPattern(p);
+  renderServoSteps(p);
+  let label = field === 'pos_s' ? 'S' : field === 'pos_m' ? 'M' : 'E';
+  ecLog('Position ' + pos + 'm applied to step ' + p.steps.length + ' [' + label + ']', 'ok');
+}
+document.getElementById('calc-pos-apply-s').addEventListener('click', () => _applyPosToStep('pos_s'));
+document.getElementById('calc-pos-apply-m').addEventListener('click', () => _applyPosToStep('pos_m'));
+document.getElementById('calc-pos-apply-e').addEventListener('click', () => _applyPosToStep('pos_e'));
+calcPosition();
+
+// Apply config (if button exists)
+if(document.getElementById('ec-btn-apply-config')) {
+  document.getElementById('ec-btn-apply-config').addEventListener('click', () => {
+    if(!ecConnected) { alert('Connect first'); return; }
+    let vel = parseInt(document.getElementById('ec-velocity').value) || 80000;
+    let acc = parseInt(document.getElementById('ec-accel').value) || 6000;
+    let dec = parseInt(document.getElementById('ec-decel').value) || 6000;
+    let cspVel = parseInt(document.getElementById('ec-csp-vel').value) || 100;
+    let promises = [];
+    for(let i = 0; i < ecSlaves; i++) {
+      promises.push(ecFetch('/set_speed', {slave:i, velocity:vel, accel:acc, decel:dec}));
+      promises.push(ecFetch('/set_csp_velocity', {slave:i, velocity:cspVel}));
+    }
+    Promise.all(promises).then(() => console.log('Config applied'));
+  });
+}
+
+// Channel enable/disable all
+document.getElementById('btn-all-on').addEventListener('click', () => {
+  disabledChans.clear();
+  syncDisabledToTD();
+  renderChanToggles();
+});
+document.getElementById('btn-all-off').addEventListener('click', () => {
+  for(let ch = firstChan; ch < firstChan + totalChans; ch++) disabledChans.add(ch);
+  syncDisabledToTD();
+  renderChanToggles();
+});
+
+// Mapping grid controls
+document.getElementById('map-cols').addEventListener('change', e => {
+  mapCols = Math.max(1, parseInt(e.target.value) || 6);
+  saveMapToTD();
+  renderMapGrid();
+});
+document.getElementById('map-rows').addEventListener('change', e => {
+  mapRows = Math.max(1, parseInt(e.target.value) || 4);
+  saveMapToTD();
+  renderMapGrid();
+});
+document.getElementById('btn-map-autofill').addEventListener('click', () => {
+  let startCh = parseInt(document.getElementById('map-auto-start').value) || 0;
+  mapGrid = {};
+  let ch = startCh;
+  for(let y = 0; y < mapRows; y++) {
+    for(let x = 0; x < mapCols; x++) {
+      mapGrid[x + ',' + y] = ch;
+      ch++;
+    }
+  }
+  saveMapToTD();
+  renderMapGrid();
+});
+document.getElementById('btn-map-clear').addEventListener('click', () => {
+  if(!confirm('Clear all channel assignments?')) return;
+  mapGrid = {};
+  saveMapToTD();
+  renderMapGrid();
+});
+
+// New Cue
+document.getElementById('btn-new-cue').addEventListener('click', () => {
+  let name = 'Cue ' + (cues.length + 1);
+  cues.push({ name: name, patterns: [] });
+  selectedCueIdx = cues.length - 1;
+  saveCuesToTD();
+  renderAll();
+});
+
+// Cue name change
+document.getElementById('cue-name').addEventListener('change', e => {
+  if(selectedCueIdx < 0) return;
+  let oldName = cues[selectedCueIdx].name;
+  let newName = e.target.value.trim() || oldName;
+  // Update placed cues references
+  placedCues.forEach(pc => { if(pc.cueName === oldName) pc.cueName = newName; });
+  cues[selectedCueIdx].name = newName;
+  syncAllToTD();
+  renderAll();
+});
+
+// Edit cue button
+document.getElementById('btn-edit-cue').addEventListener('click', () => {
+  if(selectedCueIdx < 0) return;
+  editingCueIdx = selectedCueIdx;
+  selectedPatIdx = -1;
+  switchToTab('pattern-editor');
+});
+
+
+// Back to cues
+document.getElementById('btn-back-cues').addEventListener('click', () => {
+  editingCueIdx = -1;
+  selectedPatIdx = -1;
+  switchToTab('cue-manager');
+});
+
+// Add pattern from dropdown
+document.getElementById('add-pattern').addEventListener('click', () => {
+  if(editingCueIdx < 0) return;
+  let type = document.getElementById('add-pattern-type').value;
+  if(type === 'servo') {
+    cues[editingCueIdx].patterns.push({ type: 'servo', start: 0, duration: 10, seq_mode: 'CSP', loop_mode: 'once', loop_count: 1, steps: [{pos_s: '0.0', pos_m: '0.0', pos_e: '0.0', csp_velocity: 100, hold: 1.0}], config: {velocity: 80000, accel: 6000, decel: 6000, steps_per_meter: 792914, raw_steps_per_meter: 202985985}, ramp_up: 10, hold_high: 0, ramp_down: 0, hold_low: 0, start_chan: 0, num_chans: 1, delay_ms: 0 });
+  } else {
+    cues[editingCueIdx].patterns.push({ type: 'dmx', start: 0, ramp_up: 2, hold_high: 1, ramp_down: 2, hold_low: 1, start_chan: 12, num_chans: 6, delay_ms: 500 });
+  }
+  selectedPatIdx = cues[editingCueIdx].patterns.length - 1;
+  saveCuesToTD(); savePlacedToTD();
+  renderAll();
+});
+
+// Pattern properties
+['p-start','p-rampup','p-holdhigh','p-rampdown','p-holdlow','p-startchan','p-numchans','p-delay'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    if(editingCueIdx < 0 || selectedPatIdx < 0) return;
+    let p = cues[editingCueIdx].patterns[selectedPatIdx];
+    p.ramp_up = parseFloat(document.getElementById('p-rampup').value) || 0;
+    p.hold_high = parseFloat(document.getElementById('p-holdhigh').value) || 0;
+    p.ramp_down = parseFloat(document.getElementById('p-rampdown').value) || 0;
+    p.hold_low = parseFloat(document.getElementById('p-holdlow').value) || 0;
+    p.start_chan = parseInt(document.getElementById('p-startchan').value) || 0;
+    p.num_chans = parseInt(document.getElementById('p-numchans').value) || 1;
+    p.delay_ms = parseFloat(document.getElementById('p-delay').value) || 0;
+    let patFullDur = getPatDur(p) + (p.num_chans - 1) * (p.delay_ms / 1000);
+    let maxStart = Math.max(0, totalDur - patFullDur);
+    p.start = Math.max(0, Math.min(maxStart, parseFloat(document.getElementById('p-start').value) || 0));
+    saveCuesToTD(); savePlacedToTD();
+    renderAll();
+  });
+});
+
+// Scrub on cue timeline
+let isScrubbing = false;
+function seekToX(clientX, container) {
+  let rect = container.getBoundingClientRect();
+  let scrollLeft = container.scrollLeft || 0;
+  let x = clientX - rect.left - 60 + scrollLeft;
+  let laneW = getLaneWidth(container.id);
+  if(laneW <= 0) return;
+  let frac = Math.max(0, Math.min(1, x / laneW));
+  currentTime = frac * totalDur;
+  updatePlayheads();
+  let s = "t = dc.op('timer1')\n";
+  s += "t.par.cuepoint = " + frac + "\n";
+  s += "t.par.cuepulse.pulse()\nresult='seeked'";
+  tdExec(s);
+}
+
+document.getElementById('cue-ruler').addEventListener('mousedown', e => { isScrubbing = true; seekToX(e.clientX, document.getElementById('cue-tracks')); });
+document.getElementById('ruler').addEventListener('mousedown', e => { isScrubbing = true; seekToX(e.clientX, document.getElementById('tracks')); });
+document.addEventListener('mousemove', e => { if(isScrubbing) seekToX(e.clientX, currentTab === 'cue-manager' ? document.getElementById('cue-tracks') : document.getElementById('tracks')); });
+document.addEventListener('mouseup', () => { isScrubbing = false; });
+
+// Scroll sync
+document.getElementById('cue-tracks').addEventListener('scroll', function() {
+  document.getElementById('cue-ruler').scrollLeft = this.scrollLeft;
+});
+document.getElementById('tracks').addEventListener('scroll', function() {
+  document.getElementById('ruler').scrollLeft = this.scrollLeft;
+});
+
+window.addEventListener('resize', () => { renderAll(); updateLaneCache(); });
+
+// ============ PROJECT SAVE / LOAD / NEW ============
+function getProjectData() {
+  return {
+    version: 1,
+    totalDur: totalDur,
+    firstChan: firstChan,
+    totalChans: totalChans,
+    maxDeg: parseFloat(document.getElementById('maxDeg').value) || 180,
+    lagTime: parseFloat(document.getElementById('lagTime').value) || 0.8,
+    disabledChans: Array.from(disabledChans),
+    cues: cues,
+    placedCues: placedCues,
+    mapCols: mapCols,
+    mapRows: mapRows,
+    mapGrid: mapGrid
+  };
+}
+
+function applyProjectData(proj) {
+  cues = proj.cues || [];
+  placedCues = proj.placedCues || [];
+  totalDur = proj.totalDur || 60;
+  firstChan = proj.firstChan || 0;
+  totalChans = proj.totalChans || 50;
+  disabledChans = new Set(proj.disabledChans || []);
+  document.getElementById('totalDur').value = totalDur;
+  setDurMinSec(totalDur);
+  document.getElementById('maxDeg').value = proj.maxDeg || 180;
+  document.getElementById('lagTime').value = proj.lagTime || 0.8;
+  document.getElementById('firstChan').value = firstChan;
+  document.getElementById('totalChans').value = totalChans;
+  mapCols = proj.mapCols || 6;
+  mapRows = proj.mapRows || 4;
+  mapGrid = proj.mapGrid || {};
+  document.getElementById('map-cols').value = mapCols;
+  document.getElementById('map-rows').value = mapRows;
+  tdExec("dc.par.Totaldur=" + totalDur + "\ndc.par.Firstchan=" + firstChan + "\ndc.par.Totalchans=" + totalChans + "\ndc.par.Maxdegrees=" + (proj.maxDeg||180) + "\ndc.par.Lagtime=" + (proj.lagTime||0.8) + "\nresult='ok'");
+  saveCuesToTD();
+  savePlacedToTD();
+  syncDisabledToTD();
+  saveMapToTD();
+  selectedCueIdx = -1;
+  editingCueIdx = -1;
+  selectedPatIdx = -1;
+  switchToTab('cue-manager');
+  renderAll();
+}
+
+function loadProjectList() {
+  let s = "import json\ntbl = dc.op('projects')\nnames = []\n";
+  s += "if tbl and tbl.numRows >= 2:\n";
+  s += "    for r in range(1, tbl.numRows):\n";
+  s += "        names.append(tbl[r,'name'].val)\n";
+  s += "result = names";
+  tdExec(s).then(d => {
+    let sel = document.getElementById('project-list');
+    sel.innerHTML = '<option value="">-- Select Project --</option>';
+    if(d && d.data && d.data.result) {
+      d.data.result.forEach(name => {
+        let opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        sel.appendChild(opt);
+      });
+    }
+  });
+}
+
+document.getElementById('btn-save-project').addEventListener('click', () => {
+  let name = prompt('Project name:', 'Project ' + new Date().toISOString().slice(0,10));
+  if(!name) return;
+  let proj = getProjectData();
+  let jsonStr = JSON.stringify(proj);
+  let b64 = btoa(unescape(encodeURIComponent(jsonStr)));
+  let safeName = name.replace(/'/g, "\\'");
+  let s = "import json, base64\ntbl = dc.op('projects')\n";
+  s += "data = base64.b64decode('" + b64 + "').decode('utf-8')\n";
+  s += "found = False\n";
+  s += "for r in range(1, tbl.numRows):\n";
+  s += "    if tbl[r,'name'].val == '" + safeName + "':\n";
+  s += "        tbl[r,'data_json'] = data\n";
+  s += "        found = True\n";
+  s += "        break\n";
+  s += "if not found:\n";
+  s += "    tbl.appendRow(['" + safeName + "', data])\n";
+  s += "result='saved'";
+  tdExec(s).then(() => { loadProjectList(); });
+});
+
+document.getElementById('btn-load-project').addEventListener('click', () => {
+  let name = document.getElementById('project-list').value;
+  if(!name) { alert('Select a project first.'); return; }
+  let s = "import json\ntbl = dc.op('projects')\nresult = None\n";
+  s += "for r in range(1, tbl.numRows):\n";
+  s += "    if tbl[r,'name'].val == '" + name.replace(/'/g, "\\'") + "':\n";
+  s += "        result = json.loads(tbl[r,'data_json'].val)\n";
+  s += "        break";
+  tdExec(s).then(d => {
+    if(d && d.data && d.data.result) {
+      applyProjectData(d.data.result);
+    } else {
+      alert('Project not found.');
+    }
+  });
+});
+
+document.getElementById('btn-delete-project').addEventListener('click', () => {
+  let name = document.getElementById('project-list').value;
+  if(!name) { alert('Select a project first.'); return; }
+  if(!confirm('Delete project "' + name + '"?')) return;
+  let s = "tbl = dc.op('projects')\n";
+  s += "for r in range(1, tbl.numRows):\n";
+  s += "    if tbl[r,'name'].val == '" + name.replace(/'/g, "\\'") + "':\n";
+  s += "        tbl.deleteRow(r)\n";
+  s += "        break\n";
+  s += "result='deleted'";
+  tdExec(s).then(() => { loadProjectList(); });
+});
+
+document.getElementById('btn-new-project').addEventListener('click', () => {
+  if(!confirm('Start a new project? This will clear all cues and patterns.')) return;
+  applyProjectData({ totalDur: 60, firstChan: 0, totalChans: 50, maxDeg: 180, lagTime: 0.8, disabledChans: [], cues: [], placedCues: [] });
+});
+
+// Init
+loadFromTD();
+loadMapFromTD();
+loadProjectList();
+setTimeout(pollTime, 500);
+setTimeout(pollLiveValues, 1000);
+requestAnimationFrame(animatePlayhead);
+requestAnimationFrame(animateOutput);
+</script>
+</body>
+</html>
