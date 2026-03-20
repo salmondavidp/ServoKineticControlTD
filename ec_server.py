@@ -139,7 +139,7 @@ class ECHandler(BaseHTTPRequestHandler):
             return motor.send_command(ECMotorProcess.CMD_DISCONNECT)
 
         elif path == "/enable_all":
-            return motor.send_command(ECMotorProcess.CMD_ENABLE_ALL)
+            return motor.send_command(ECMotorProcess.CMD_ENABLE_ALL, timeout=15)
 
         elif path == "/disable_all":
             return motor.send_command(ECMotorProcess.CMD_DISABLE_ALL)

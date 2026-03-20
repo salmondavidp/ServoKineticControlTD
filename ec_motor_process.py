@@ -144,9 +144,11 @@ class ECMotorProcess:
 
             error_name = None
             if fault and error_code:
-                # Import here to avoid circular dependency
-                from ethercat_controller import EtherCATController
-                error_name = EtherCATController.KNOWN_ERROR_CODES.get(error_code)
+                try:
+                    from ethercat_controller import EtherCATController
+                    error_name = EtherCATController.KNOWN_ERROR_CODES.get(error_code)
+                except:
+                    pass
 
             slaves.append({
                 'index': i,
@@ -220,12 +222,85 @@ class ECMotorProcess:
         def send_resp(success, message='', data=None):
             resp_queue.put({'success': success, 'message': message, 'data': data, 'error': None if success else message})
 
+        def safe_disconnect():
+            """Safely disconnect and clean up EtherCAT"""
+            nonlocal ec, mc
+            if ec:
+                try:
+                    ec._pdo_running = False
+                    time.sleep(0.05)
+                except:
+                    pass
+                try:
+                    ec.master.close()
+                except:
+                    pass
+                try:
+                    ec.connected = False
+                except:
+                    pass
+            ec = None
+            mc = None
+            shared_connected.value = 0
+            shared_num_slaves.value = 0
+
+        def do_connect(adapter, mode, velocity, accel, decel, csp_velocity,
+                       steps_per_meter, raw_steps_per_meter):
+            """Connect to EtherCAT — creates fresh controller each time"""
+            nonlocal ec, mc
+
+            # Always disconnect first
+            safe_disconnect()
+            time.sleep(0.2)
+
+            # Validate adapter
+            if not adapter:
+                return False, "No adapter specified"
+
+            proc_log(log_queue, f"Connecting: adapter={adapter}, mode={mode}")
+
+            # Create fresh controller
+            ec = EtherCATController(interface=adapter)
+            mode_map = {"PP": 1, "PV": 3, "CSP": 8}
+            ec.mode = mode_map.get(mode.upper(), 8)
+            ec._velocity = velocity
+            ec._accel = accel
+            ec._decel = decel
+            ec.ACTUAL_STEPS_PER_METER = steps_per_meter
+            ec.RAW_STEPS_PER_METER = raw_steps_per_meter
+            ec.SCALE_FACTOR = steps_per_meter / raw_steps_per_meter
+
+            if not ec.connect():
+                ec = None
+                return False, "Connection failed - no slaves found"
+
+            # Create movement controller
+            mc = MovementController(ec)
+            mc.ACTUAL_STEPS_PER_METER = steps_per_meter
+            mc.RAW_STEPS_PER_METER = raw_steps_per_meter
+            mc.SCALE_FACTOR = steps_per_meter / raw_steps_per_meter
+            mc._velocity = velocity
+            mc._accel = accel
+            mc._decel = decel
+            mc._csp_max_velocity = csp_velocity
+            mc._mode = ec.mode
+            mc.initialize()
+
+            for i in range(ec.slaves_count):
+                ec._slave_csp_velocity[i] = csp_velocity
+
+            shared_connected.value = 1
+            shared_num_slaves.value = ec.slaves_count
+            shared_mode.value = ec.mode
+
+            proc_log(log_queue, f"Connected: {ec.slaves_count} slaves, mode={mode}")
+            return True, f"Connected: {ec.slaves_count} slaves"
+
         def update_shared_status():
             """Write current status to shared memory — PDO cached reads ONLY, no SDO"""
             if not ec or not ec.connected:
                 return
             for i in range(min(ec.slaves_count, 8)):
-                # These read from _cached_input (set by PDO loop) — no bus access
                 pos_m = ec.read_position_meters(i)
                 status_word = ec.read_status(i)
                 shared_data[i] = pos_m
@@ -234,9 +309,7 @@ class ECMotorProcess:
                 # Track fault bit — but NEVER do SDO read here (causes jitter)
                 if status_word & 0x0008:
                     fault_bit_counts[i] += 1
-                    # After sustained fault, mark it but don't SDO-read
                     if fault_bit_counts[i] >= 20:
-                        # Use a generic fault code to signal UI
                         if shared_data[16 + i] == 0.0:
                             shared_data[16 + i] = 0xFFFF  # generic fault marker
                 else:
@@ -362,7 +435,7 @@ class ECMotorProcess:
                                         pos = {sid: pos[0]}
                                     else:
                                         continue
-                                proc_log(log_queue, f"Step {step_idx+1} [{phase}]: CSP move to {pos} vel={csp_vel}")
+                                proc_log(log_queue, f"Step {step_idx+1} [{phase}]: CSP vel={csp_vel} -> {pos}")
                                 if pos and mc:
                                     try:
                                         mc.move_all_to_meters(pos, wait=True)
@@ -397,13 +470,9 @@ class ECMotorProcess:
                     seq_running_flag[0] = False
 
         # ====== STATUS UPDATE THREAD ======
-        # Periodically update shared memory so HTTP reads are always fresh
-        # Runs at LOW priority to never preempt PDO thread
         def status_updater():
-            # Lower this thread's priority so PDO thread always wins
             try:
                 import ctypes as ct
-                THREAD_SET_INFORMATION = 0x0020
                 handle = ct.windll.kernel32.GetCurrentThread()
                 ct.windll.kernel32.SetThreadPriority(handle, -1)  # BELOW_NORMAL
             except:
@@ -413,13 +482,12 @@ class ECMotorProcess:
                     update_shared_status()
                 except:
                     pass
-                time.sleep(0.1)  # 100ms update rate — less contention
+                time.sleep(0.1)  # 100ms update rate
 
         status_thread = threading.Thread(target=status_updater, daemon=True)
         status_thread.start()
 
         # ====== MAIN COMMAND LOOP ======
-        # Set command thread to lower priority so PDO thread always wins
         try:
             import ctypes as ct2
             handle = ct2.windll.kernel32.GetCurrentThread()
@@ -450,19 +518,7 @@ class ECMotorProcess:
                     send_resp(True, f"Found {len(result)} adapters", {'adapters': result})
 
                 elif cmd == ECMotorProcess.CMD_CONNECT:
-                    # Disconnect existing
-                    if ec and ec.connected:
-                        try:
-                            ec._pdo_running = False
-                            time.sleep(0.05)
-                            ec.master.close()
-                            ec.connected = False
-                        except:
-                            pass
-                        ec = None
-                        mc = None
-
-                    adapter = data.get('adapter')
+                    adapter = data.get('adapter', '')
                     mode = data.get('mode', 'CSP')
                     velocity = data.get('velocity', 80000)
                     accel = data.get('accel', 6000)
@@ -471,59 +527,19 @@ class ECMotorProcess:
                     steps_per_meter = data.get('steps_per_meter', 792914)
                     raw_steps_per_meter = data.get('raw_steps_per_meter', 202985985)
 
-                    proc_log(log_queue, f"Connecting: adapter={adapter}, mode={mode}")
-
-                    ec = EtherCATController(interface=adapter)
-                    mode_map = {"PP": 1, "PV": 3, "CSP": 8}
-                    ec.mode = mode_map.get(mode.upper(), 8)
-                    ec._velocity = velocity
-                    ec._accel = accel
-                    ec._decel = decel
-                    ec.ACTUAL_STEPS_PER_METER = steps_per_meter
-                    ec.RAW_STEPS_PER_METER = raw_steps_per_meter
-                    ec.SCALE_FACTOR = steps_per_meter / raw_steps_per_meter
-
-                    if not ec.connect():
-                        ec = None
-                        send_resp(False, "Connection failed - no slaves found")
-                        continue
-
-                    mc = MovementController(ec)
-                    mc.ACTUAL_STEPS_PER_METER = steps_per_meter
-                    mc.RAW_STEPS_PER_METER = raw_steps_per_meter
-                    mc.SCALE_FACTOR = steps_per_meter / raw_steps_per_meter
-                    mc._velocity = velocity
-                    mc._accel = accel
-                    mc._decel = decel
-                    mc._csp_max_velocity = csp_velocity
-                    mc._mode = ec.mode
-                    mc.initialize()
-
-                    for i in range(ec.slaves_count):
-                        ec._slave_csp_velocity[i] = csp_velocity
-
-                    shared_connected.value = 1
-                    shared_num_slaves.value = ec.slaves_count
-                    shared_mode.value = ec.mode
-
-                    proc_log(log_queue, f"Connected: {ec.slaves_count} slaves, mode={mode}")
-                    send_resp(True, f"Connected: {ec.slaves_count} slaves", {
-                        'slaves': ec.slaves_count, 'mode': mode.upper()
-                    })
+                    success, msg = do_connect(
+                        adapter, mode, velocity, accel, decel, csp_velocity,
+                        steps_per_meter, raw_steps_per_meter
+                    )
+                    if success:
+                        send_resp(True, msg, {
+                            'slaves': ec.slaves_count, 'mode': mode.upper()
+                        })
+                    else:
+                        send_resp(False, msg)
 
                 elif cmd == ECMotorProcess.CMD_DISCONNECT:
-                    if ec and ec.connected:
-                        ec._pdo_running = False
-                        time.sleep(0.05)
-                        try:
-                            ec.master.close()
-                        except:
-                            pass
-                        ec.connected = False
-                    ec = None
-                    mc = None
-                    shared_connected.value = 0
-                    shared_num_slaves.value = 0
+                    safe_disconnect()
                     proc_log(log_queue, "Disconnected")
                     send_resp(True, "Disconnected")
 

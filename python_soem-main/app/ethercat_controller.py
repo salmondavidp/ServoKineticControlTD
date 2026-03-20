@@ -223,7 +223,8 @@ class EtherCATController:
                         return False
             
             print(f"Found {self.slaves_count} slave(s)")
-            
+            time.sleep(0.2)  # Allow mailbox to initialize before SDO writes
+
             # Configure each slave
             for i in range(self.slaves_count):
                 slave = self.master.slaves[i]
@@ -244,10 +245,19 @@ class EtherCATController:
                 self._slave_accel[i] = self._accel
                 self._slave_decel[i] = self._decel
                 
-                # Set mode
-                slave.sdo_write(0x6060, 0x00, bytes([self.mode]))
+                # Set mode (retry up to 3 times — mailbox may not be ready immediately after config_init)
                 mode_name = {self.MODE_PP: 'PP', self.MODE_PV: 'PV', self.MODE_CSP: 'CSP'}.get(self.mode, 'Unknown')
-                print(f"  Mode: {mode_name} ({self.mode})")
+                for _attempt in range(3):
+                    try:
+                        slave.sdo_write(0x6060, 0x00, bytes([self.mode]))
+                        print(f"  Mode: {mode_name} ({self.mode})")
+                        break
+                    except Exception as e:
+                        if _attempt < 2:
+                            print(f"  Mode set attempt {_attempt + 1} failed ({e}), retrying...")
+                            time.sleep(0.2)
+                        else:
+                            raise Exception(f"Failed to set mode on slave {i} after 3 attempts: {e}")
                 
                 # CSP sync compensation parameters
                 if self.mode == self.MODE_CSP:
@@ -358,16 +368,23 @@ class EtherCATController:
             
             print("\nAll slaves OPERATIONAL")
             self.connected = True
-            
-            # Start PDO thread
-            self._start_pdo_thread()
-            
-            time.sleep(0.1)
-            
-            # CRITICAL for CSP: Sync positions to actual
+
+            # CRITICAL for CSP: Sync positions to actual BEFORE starting PDO thread.
+            # The PDO loop sends _target_position to the drive every 1ms. If we start
+            # the PDO thread first, it sends target_position=0 (the init value) which
+            # causes a following error fault if the drive is not at position 0.
             for i in range(self.slaves_count):
                 self.sync_position_to_actual(i)
-            
+
+            # Start PDO thread (now safe — target positions match actual)
+            self._start_pdo_thread()
+
+            time.sleep(0.1)
+
+            # Final sync after PDO thread stabilizes
+            for i in range(self.slaves_count):
+                self.sync_position_to_actual(i)
+
             return True
             
         except Exception as e:
